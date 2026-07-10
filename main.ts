@@ -158,6 +158,46 @@ fastify.get('/api/db', async (request, reply) => {
     return data;
 });
 
+fastify.get('/api/trigger-miner', async (request, reply) => {
+    const { title, episode } = request.query as { title?: string, episode?: string };
+    if (!title) {
+        return reply.status(400).send({ error: "Missing title parameter" });
+    }
+
+    const GITHUB_PAT = process.env.GITHUB_PAT;
+    if (!GITHUB_PAT) {
+        return reply.status(500).send({ error: "GITHUB_PAT environment variable is not configured" });
+    }
+
+    try {
+        const response = await fetch('https://api.github.com/repos/Zcross091/Ronin-API/dispatches', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/vnd.github.v3+json',
+                'Authorization': `token ${GITHUB_PAT}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                event_type: 'search-or-mine',
+                client_payload: {
+                    query: title
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.text();
+            fastify.log.error(`GitHub API error: ${errorData}`);
+            return reply.status(500).send({ error: "Failed to trigger GitHub Action", details: errorData });
+        }
+
+        return { success: true, message: `Miner triggered for ${title}` };
+    } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: err.message });
+    }
+});
+
 const start = async () => {
     if (process.env.VERCEL) {
         // Skip listening when running in Vercel's serverless environment
