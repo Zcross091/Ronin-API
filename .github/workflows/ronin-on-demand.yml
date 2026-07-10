@@ -1,0 +1,44 @@
+name: Ronin On-Demand Mining
+on:
+  repository_dispatch:
+    types: [search-or-mine]
+  workflow_dispatch:
+    inputs:
+      query:
+        description: 'Anime title to mine'
+        required: true
+        default: 'Naruto'
+jobs:
+  mine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install deps
+        run: |
+          cd "Ronin API"
+          npm install
+
+      - name: Install ts-node
+        run: npm install -g ts-node typescript
+
+      - name: Run miner
+        run: |
+          cd "Ronin API"
+          QUERY="${{ github.event.client_payload.query || github.event.inputs.query }}"
+          echo "Mining for: $QUERY"
+          ts-node runQuery.ts "$QUERY"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GOGO_DOMAINS: ${{ secrets.GOGO_DOMAINS }}
+          ANIWAVE_CLUSTER: ${{ secrets.ANIWAVE_CLUSTER }}
+          HIANIME_CLUSTER: ${{ secrets.HIANIME_CLUSTER }}
+          ANILIST_ACTIVE_DOMAIN: ${{ secrets.ANILIST_ACTIVE_DOMAIN }}
+          MYANIMELIST_ACTIVE_DOMAIN: ${{ secrets.MYANIMELIST_ACTIVE_DOMAIN }}
+          NYAASI_ACTIVE_DOMAIN: ${{ secrets.NYAASI_ACTIVE_DOMAIN }}
