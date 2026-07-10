@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "es2016",
+    "module": "commonjs",
+    "paths": {
+      "*": ["./node_modules/*", "./types/*"]
+    },                                     
+
+    "outDir": "dist",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true ,
+    "strict": true,
+    "skipLibCheck": true,
+
+  },
+  "include": [
+    "**/*.ts", "main.ts", "scrapper.ts",
+  ],
+  "exclude": [
+    "node_modules",
+    "<node_internals>/**",
+    "bin/**"
+  ]
+}
