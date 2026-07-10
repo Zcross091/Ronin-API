@@ -21,7 +21,6 @@ jobs:
 
       - name: Install deps
         run: |
-          cd "Ronin API"
           npm install
 
       - name: Install ts-node
@@ -29,7 +28,6 @@ jobs:
 
       - name: Run miner
         run: |
-          cd "Ronin API"
           QUERY="${{ github.event.client_payload.query || github.event.inputs.query }}"
           echo "Mining for: $QUERY"
           ts-node runQuery.ts "$QUERY"
