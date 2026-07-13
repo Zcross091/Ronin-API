@@ -183,6 +183,28 @@ export enum SubOrSub {
   BOTH = 'both',
 }
 
+export interface IMangaResult {
+  id: string;
+  title: string | ITitle;
+  altTitles?: string[];
+  description?: string;
+  status?: MediaStatus;
+  releaseDate?: number | string;
+  image?: string;
+  headerForImage?: { [k: string]: string };
+  [x: string]: unknown; // other fields
+}
+
+export interface IMangaInfo extends IMangaResult {
+  malId?: number | string;
+  authors?: string[];
+  genres?: string[];
+  links?: string[];
+  characters?: any[];
+  recommendations?: IMangaResult[];
+  chapters?: IMangaChapter[];
+}
+
 export interface IMangaChapter {
   id: string;
   title: string;

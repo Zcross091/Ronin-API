@@ -6,6 +6,8 @@ import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import gogoanime from './routes/gogoanime';
+import manga from './routes/manga';
 
 dotenv.config();
 puppeteer.use(StealthPlugin());
@@ -19,6 +21,8 @@ const supabaseKey = process.env.SUPABASE_KEY || "";
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
 const fastify = Fastify({ logger: true });
+export const redis = null;
+fastify.register(manga, { prefix: '/manga' });
 
 async function saveToSupabase(title: string, episode: number, type: string, url: string) {
     if (!supabase) return;
