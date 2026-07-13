@@ -10,7 +10,7 @@ puppeteer.use(StealthPlugin());
 
 const GOGO_DOMAINS = (process.env.GOGO_DOMAINS || '')
     .split(',')
-    .map(d => d.trim().replace(/\/popular\/?$/, '').replace(/\/$/, ''))
+    .map(d => d.trim().replace(/\/(popular|home)\/?$/i, '').replace(/\/$/, ''))
     .filter(Boolean);
 
 const ANIWAVE_CLUSTER = (process.env.ANIWAVE_CLUSTER || '')
@@ -20,7 +20,7 @@ const ANIWAVE_CLUSTER = (process.env.ANIWAVE_CLUSTER || '')
 
 const HIANIME_CLUSTER = (process.env.HIANIME_CLUSTER || '')
     .split(',')
-    .map(d => d.trim().replace(/\/$/, ''))
+    .map(d => d.trim().replace(/\/(popular|home)\/?$/i, '').replace(/\/$/, ''))
     .filter(Boolean);
 
 const supabaseUrl = process.env.SUPABASE_URL || '';
