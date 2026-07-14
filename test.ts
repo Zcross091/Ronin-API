@@ -1,11 +1,23 @@
-import Gogoanime from './providers/gogoanime';
+import axios from 'axios';
 
 (async () => {
-  const gogo = new Gogoanime();
+  const embedUrl = 'https://gogohd.net/streaming.php?id=OTc2MDg1';
   try {
-    const search = await gogo.fetchEpisodeSources('naruto-episode-1');
-    console.log(JSON.stringify(search, null, 2));
-  } catch (e) {
-    console.error(e);
+    console.log(`Fetching: ${embedUrl}`);
+    const res = await axios.get(embedUrl, {
+      headers: {
+        'Referer': 'https://anitaku.to/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    console.log('Status:', res.status);
+    console.log('Headers:', res.headers);
+    console.log('Body snippet:', res.data.substring(0, 1000));
+  } catch (e: any) {
+    console.error('Error Status:', e.response?.status);
+    console.error('Error Message:', e.message);
+    if (e.response) {
+      console.error('Error Body snippet:', e.response.data?.substring?.(0, 1000) || e.response.data);
+    }
   }
 })();
