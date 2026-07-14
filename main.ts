@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import gogoanime from './routes/gogoanime';
 import manga from './routes/manga';
+import { GogoCDN } from './extractors';
 
 dotenv.config();
 puppeteer.use(StealthPlugin());
@@ -199,6 +200,21 @@ fastify.get('/api/trigger-miner', async (request, reply) => {
     } catch (err: any) {
         fastify.log.error(err);
         return reply.status(500).send({ error: err.message });
+    }
+});
+
+fastify.get('/api/resolve', async (request, reply) => {
+    const { url } = request.query as { url?: string };
+    if (!url) {
+        return reply.status(400).send({ error: "Missing url parameter" });
+    }
+    try {
+        const extractor = new GogoCDN();
+        const results = await extractor.extract(new URL(url));
+        return { status: 200, results };
+    } catch (e: any) {
+        fastify.log.error(e);
+        return reply.status(500).send({ error: e.message || "Failed to resolve stream." });
     }
 });
 

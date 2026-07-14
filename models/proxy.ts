@@ -21,6 +21,9 @@ export class Proxy {
 
     // INTERCEPTOR: Route ALL requests through FlareSolverr to bypass Cloudflare
     this.client.interceptors.request.use((config) => {
+      if (process.env.VERCEL) {
+        return config;
+      }
       const originalUrl = config.url;
       
       // We only want to proxy the initial HTML fetches, not AJAX calls like load-list-episode 
@@ -40,6 +43,9 @@ export class Proxy {
 
     // INTERCEPTOR: Unwrap FlareSolverr response back into normal HTML for Cheerio
     this.client.interceptors.response.use((response) => {
+      if (process.env.VERCEL) {
+        return response;
+      }
       if (response.data && response.data.solution && response.data.solution.response) {
         response.data = response.data.solution.response;
       }
