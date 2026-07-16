@@ -1,0 +1,35 @@
+name: Manga On-Demand Mining
+on:
+  repository_dispatch:
+    types: [search-or-mine-manga]
+  workflow_dispatch:
+    inputs:
+      query:
+        description: 'Manga title to mine'
+        required: true
+        default: 'Solo Leveling'
+jobs:
+  mine-manga:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install ts-node globally
+        run: npm install -g ts-node typescript
+
+      - name: Run Manga Miner
+        run: |
+          QUERY="${{ github.event.client_payload.query || github.event.inputs.query }}"
+          echo "Mining for Manga: $QUERY"
+          ts-node manga_miner.ts "$QUERY"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

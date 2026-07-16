@@ -31,15 +31,20 @@ async function saveMangaToSupabase(title: string, mangaId: string, provider: str
 }
 
 async function mineTrendingManga() {
-    console.log('🚀 Starting Daily Manga Miner...');
+    console.log('🚀 Starting Manga Miner...');
+    
+    // Check for search query argument (e.g., ts-node manga_miner.ts "One Piece")
+    const args = process.argv.slice(2);
+    const query = args[0] || '';
     
     try {
-        // Fetch top trending manga by searching with an empty query on Comick (or top 30)
-        // Comick search defaults to popular if no query is given in many cases, or we can just run a general search.
-        // For the sake of trending, let's just use a broad search or rely on Comick's default search endpoint.
-        console.log('🔍 Fetching top trending manga from MangaDex...');
-        // MangaDex search with an empty query often returns recent or popular
-        const searchResults = await mangadex.search('', 1);
+        if (query) {
+            console.log(`🔍 Fetching manga matching "${query}" from MangaDex...`);
+        } else {
+            console.log('🔍 Fetching top trending manga from MangaDex...');
+        }
+        
+        const searchResults = await mangadex.search(query, 1);
         
         const mangaList = searchResults.results.slice(0, 30); // Grab top 30
         
