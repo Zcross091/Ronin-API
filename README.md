@@ -1,61 +1,127 @@
-![bannner.png](https://raw.githubusercontent.com/animetize/animetize-api/main/Animetize_banner.png)
--------
+![Ronin API Banner](./banner.png)
+
+# ⚔️ Ronin API
+### **A Premium, High-Performance Scraping Engine, Decryption Proxy, & Database Cache Layer**
+
+Ronin API is a highly optimized backend coordinator designed to power both native apps (like the **RoninX Client**) and web applications (like **Animetize Play**). It acts as a serverless gateway to manage database caching, bypass cross-origin browser restrictions (CORS), decrypt complex video streaming iframes, and trigger on-demand automated scraper workflows.
+
+---
+
+## 🚀 Key Capabilities
+
+*   **⚡ Sub-Second Database Caching**: Backed by **Supabase**, Ronin API queries, matches, and delivers direct stream links and manga mappings in milliseconds—saving valuable time and computing resources compared to scraping on every request.
+*   **📡 On-Demand Cloud Mining**: When an episode isn't in the cache (Cache Miss), the API automatically triggers a secure **GitHub Repository Dispatch** to spin up headless Puppeteer scrapers (`ronin-on-demand.yml`) in the cloud. It harvests the media, saves it to Supabase, and updates the client.
+*   **🔓 Real-Time Stream Decryption**: Built-in extractors (such as **GogoCDN / Extractors**) to decrypt complex iframe links into clean, direct video formats (like `.mp4` or `.m3u8`) for seamless player integrations.
+*   **🌐 CORS & Anti-Bot Bypass**: Out-of-the-box user-agent masquerading and request proxying to bypass strict anti-scraping firewalls (like Cloudflare) and cross-origin resource sharing blocks inside web browsers.
+*   **📖 Integrated Manga Reader Engine**: Secure routing endpoints mapping directly to MangaDex and ComicK to fetch details, chapters, and raw page images for custom webtoon-style readers.
+
+---
+
+## 🛠️ API Reference
+
+### 📺 Anime Endpoints
+
+#### 1. Fetch Cached Streams
+Query the database cache using normalized titles and automated matching variants.
+*   **URL**: `/api/db`
+*   **Method**: `GET`
+*   **Query Parameters**:
+    *   `title` (string, required): Title of the anime series.
+    *   `episode` (number, required): Episode number.
+    *   `searchVariants` (JSON array string, optional): Custom title variants to check.
+*   **Response**: List of cached streams (types: `http`, `torrent`, `playwright`).
+
+#### 2. Trigger On-Demand Miner
+Wakes up the cloud Puppeteer actions runner to scrape a series.
+*   **URL**: `/api/trigger-miner`
+*   **Method**: `GET`
+*   **Query Parameters**:
+    *   `title` (string, required): Title of the series.
+    *   `episode` (string, optional): Episode to target first.
+
+#### 3. Decrypt Video Iframe
+Decrypts a GogoCDN/StreamSB iframe link to get raw video feeds.
+*   **URL**: `/api/resolve`
+*   **Method**: `GET`
+*   **Query Parameters**:
+    *   `url` (string, required): The target iframe source URL.
+
+#### 4. Torrent Search
+Search and scrape the latest P2P releases on Nyaa.si.
+*   **URL**: `/api/downloads/:query/:episode`
+*   **Method**: `GET`
+
+---
+
+### 📖 Manga Endpoints
+
+#### 1. Search Manga
+Search for a manga series on MangaDex or ComicK.
+*   **URL**: `/manga/mangadex/:query`
+*   **Method**: `GET`
+
+#### 2. Fetch Manga Info & Chapters
+*   **URL**: `/manga/mangadex/info/:mangaId`
+*   **Method**: `GET`
+
+#### 3. Load Chapter Page Images
+*   **URL**: `/manga/mangadex/read/:chapterId`
+*   **Method**: `GET`
+
+---
+
+## 📂 System Architecture
+
+```mermaid
+graph TD
+    A[Client App / Website] -->|1. Request Stream| B(Ronin API)
+    B -->|2. Check Cache| C[(Supabase Cache Database)]
+    C -->|3. Hit - Stream found| A
+    C -->|4. Miss - Empty| B
+    B -->|5. Trigger Dispatch| D[GitHub Actions Runner]
+    D -->|6. Run Puppeteer Scraper| E[Target Media Platforms]
+    E -->|7. Return Streaming Links| D
+    D -->|8. Upsert Results| C
+```
+
+---
+
+## 💻 Local Installation & Setup
+
+1. **Clone the repository**:
+   ```sh
+   git clone https://github.com/Zcross091/Ronin-API.git
+   cd Ronin-API
+   ```
+
+2. **Install Node.js dependencies**:
+   ```sh
+   npm install
+   ```
+
+3. **Configure Environment Variables**:
+   Create a `.env` file in the root directory:
+   ```env
+   PORT=8000
+   SUPABASE_URL=your_supabase_url
+   SUPABASE_KEY=your_supabase_anon_or_service_key
+   GITHUB_PAT=your_github_personal_access_token
+   GOGO_DOMAINS=domain1,domain2
+   ```
+
+4. **Start the API server**:
+   ```sh
+   npm run start
+   ```
+
+---
+
+## ☁️ Deployment
+
+*   **Vercel (Serverless)**: Seamlessly integrates as a Vercel serverless function out of the box using `vercel.json` configurations.
+*   **Render / Railway (Persistent)**: Can be run as a standard Node.js server using `npm run start` (listening on port `8000`).
+
+---
 <p align="center">
-  An API to effortlessly access information on anime from gogoanime website.
-</p> 
-<p align="center">  
-  ‼️<b> This API has been discontinued as the gogoanime website has been takendown. </b>‼️
+  <b>Developed & Maintained by Zcross091</b>
 </p>
-
-<h2> Table of Contents </h2>
-
-- [Installation](#installation)
-  - [Locally](#locally)
-  - [Heroku](#heroku)
-  - [Vercel](#vercel)
-  - [Render](#render)
-- [Documentation](#documentation)
-- [Development](#development)
-- [Provider Request](#provider-request)
-
-## Installation
-### Locally
-installation is simple.
-
-Run the following command to clone the repository, and install the dependencies.
-
-```sh
-$ git clone https://github.com/avalynndev/animetize-api.git
-$ cd animetize-api
-$ npm install #or yarn install
-```
-
-start the server!
-
-```sh
-$ npm start #or yarn start
-```
-
-### Heroku
-Host your own instance of Animetize API on Heroku using the button below.
-
-[![Deploy on Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/avalynndev/animetize-api/tree/main)
-
-### Vercel
-Host your own instance of Animetize API on Vercel using the button below.
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Favalynndev%2Fanimetize-api)
-
-### Render
-Host your own instance of Animetize API on Render using the button below.
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/avalynndev/animetize-api)
-
-## Documentation
-Please refer to the [documentation](https://animetize-docs.vercel.app/). If you need any additional help or have any questions, comments, or suggestions, just create a new issue and tag it as "help".
-
-## Development
-Pull requests and stars are always welcome, for bugs and features create a new [issue](https://github.com/avalynndev/animetize-api/issues).
-
-## Provider Request
-Make a new [issue](https://github.com/avalynndev/animetize-api/issues/new?assignees=&labels=provider+request&template=provider-request.yml) with the name of the provider on the title, as well as a link to the provider in the body paragraph.
