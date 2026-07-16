@@ -3,7 +3,7 @@
 # ⚔️ Ronin API
 ### **A Premium, High-Performance Scraping Engine, Decryption Proxy, & Database Cache Layer**
 
-Ronin API is a highly optimized backend coordinator designed to power both native apps (like the **RoninX Client**) and web applications (like **Animetize Play**). It acts as a serverless gateway to manage database caching, bypass cross-origin browser restrictions (CORS), decrypt complex video streaming iframes, and trigger on-demand automated scraper workflows.
+Ronin API is a highly optimized backend coordinator designed to power both native apps (like the **RoninX Client**) and web applications (like **Ronin Anime https://zcross091.github.io/Animetize-API-Play/**). It acts as a serverless gateway to manage database caching, bypass cross-origin browser restrictions (CORS), decrypt complex video streaming iframes, and trigger on-demand automated scraper workflows.
 
 ---
 
