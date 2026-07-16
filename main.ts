@@ -175,7 +175,7 @@ fastify.get('/api/trigger-miner', async (request, reply) => {
     }
 
     try {
-        const response = await fetch('https://api.github.com/repos/Zcross091/RoninX-Anime-Client/dispatches', {
+        const response = await fetch('https://api.github.com/repos/Zcross091/Ronin-API/dispatches', {
             method: 'POST',
             headers: {
                 'Accept': 'application/vnd.github.v3+json',
@@ -183,10 +183,9 @@ fastify.get('/api/trigger-miner', async (request, reply) => {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                event_type: 'trigger-miner',
+                event_type: 'search-or-mine',
                 client_payload: {
-                    title: title,
-                    episode: episode ?? '1'
+                    query: title
                 }
             })
         });
