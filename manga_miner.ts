@@ -8,8 +8,8 @@ const supabase = createClient(process.env.SUPABASE_URL || '', process.env.SUPABA
 const mangaread = new MangaRead();
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function mineTop300Manga() {
-    console.log('🚀 Starting Smart Top 300 Manga Miner for MangaRead...');
+async function mineTop100Manga() {
+    console.log('🚀 Starting Smart Top 100 Manga Miner for MangaRead...');
     
     // 1. PRE-FETCH BOT MEMORY: Grab current chapter counts from Supabase
     console.log('🧠 Loading bot memory from Supabase...');
@@ -31,7 +31,7 @@ async function mineTop300Manga() {
     console.log(`✅ Memory loaded! Bot remembers the chapter counts for ${dbMemory.size} manga series.`);
 
     let totalMined = 0;
-    const targetAmount = 300;
+    const targetAmount = 100; // Reduced from 300 to 100
     let page = 1;
 
     try {
@@ -44,7 +44,7 @@ async function mineTop300Manga() {
             for (const manga of mangaList) {
                 if (totalMined >= targetAmount) break;
 
-                console.log(`⏳ [${totalMined + 1}/300] Checking: ${manga.title}`);
+                console.log(`⏳ [${totalMined + 1}/100] Checking: ${manga.title}`);
                 try {
                     // Fetch the latest info from the website
                     const fullInfo = await mangaread.fetchMangaInfo(manga.id);
@@ -80,10 +80,10 @@ async function mineTop300Manga() {
             }
             page++;
         }
-        console.log('\n🎉 Smart Daily Manga Miner completed successfully!');
+        console.log('\n🎉 Smart Top 100 Daily Manga Miner completed successfully!');
     } catch (err: any) {
         console.error(`❌ Miner failed: ${err.message}`);
     }
 }
 
-mineTop300Manga();
+mineTop100Manga();
