@@ -1,12 +1,11 @@
 import { FastifyRequest, FastifyReply, FastifyInstance, RegisterOptions } from 'fastify';
-import Comick from '../providers/comick';
-import MangaDex from '../providers/mangadex';
+import MangaRead from '../providers/mangaread';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Initialize Supabase Client
+// Initialize Supabase Client[cite: 7]
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_KEY || '';
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
@@ -22,12 +21,11 @@ async function saveMangaToSupabase(title: string, mangaId: string, provider: str
 }
 
 const routes = async (fastify: FastifyInstance, options: RegisterOptions) => {
-  const comick = new Comick();
-  const mangadex = new MangaDex();
+  const mangaread = new MangaRead();
   
   const getProvider = (providerName: string) => {
-      if (providerName.toLowerCase() === 'mangadex') return mangadex;
-      return comick; // Default to Comick
+      // Defaulting all requests to MangaRead since MangaDex/Comick are removed[cite: 7]
+      return mangaread; 
   };
 
   fastify.get('/', (_, rp) => {
@@ -61,7 +59,7 @@ const routes = async (fastify: FastifyInstance, options: RegisterOptions) => {
     try {
         const res = await mangaProvider.fetchMangaInfo(id);
         
-        // Save to supabase in background
+        // Save to supabase in background[cite: 7]
         if (typeof res.title === 'string') {
            saveMangaToSupabase(res.title, res.id, mangaProvider.name).catch(() => {});
         } else if (res.title && typeof res.title === 'object' && res.title.english) {
@@ -79,6 +77,7 @@ const routes = async (fastify: FastifyInstance, options: RegisterOptions) => {
     const mangaProvider = getProvider(provider);
 
     try {
+        // MangaRead requires the chapter path, not just the ID[cite: 7]
         const res = await mangaProvider.fetchChapterPages(chapterId);
         reply.status(200).send(res);
     } catch (err: any) {
