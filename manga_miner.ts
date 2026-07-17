@@ -9,8 +9,27 @@ const mangaread = new MangaRead();
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function mineTop300Manga() {
-    console.log('🚀 Starting Top 300 Manga Miner for MangaRead...');
+    console.log('🚀 Starting Smart Top 300 Manga Miner for MangaRead...');
     
+    // 1. PRE-FETCH BOT MEMORY: Grab current chapter counts from Supabase
+    console.log('🧠 Loading bot memory from Supabase...');
+    const { data: existingRecords, error: fetchError } = await supabase
+        .from('manga_links')
+        .select('manga_id, chapters_data');
+        
+    if (fetchError) {
+        console.error('❌ Failed to load bot memory:', fetchError.message);
+        return;
+    }
+
+    // Map manga_id -> number of chapters currently saved
+    const dbMemory = new Map<string, number>();
+    existingRecords?.forEach(record => {
+        const chapCount = record.chapters_data ? record.chapters_data.length : 0;
+        dbMemory.set(record.manga_id, chapCount);
+    });
+    console.log(`✅ Memory loaded! Bot remembers the chapter counts for ${dbMemory.size} manga series.`);
+
     let totalMined = 0;
     const targetAmount = 300;
     let page = 1;
@@ -25,25 +44,35 @@ async function mineTop300Manga() {
             for (const manga of mangaList) {
                 if (totalMined >= targetAmount) break;
 
-                console.log(`⏳ [${totalMined + 1}/300] Deep diving into: ${manga.title}`);
+                console.log(`⏳ [${totalMined + 1}/300] Checking: ${manga.title}`);
                 try {
-                    // Fetch full info to get the chapter array
+                    // Fetch the latest info from the website
                     const fullInfo = await mangaread.fetchMangaInfo(manga.id);
+                    const scrapedChapterCount = fullInfo.chapters?.length || 0;
                     
-                    // Upsert into Supabase
-                    const { error } = await supabase.from('manga_links').upsert({ 
-                        title: manga.title.toLowerCase().trim(), 
-                        manga_id: manga.id, 
-                        provider: mangaread.name,
-                        chapters_data: fullInfo.chapters,
-                        updated_at: new Date()
-                    }, { onConflict: 'title, provider' });
+                    // Check what the bot remembers for this specific manga ID
+                    const savedChapterCount = dbMemory.get(manga.id) || 0;
 
-                    if (error) throw error;
-                    console.log(`   📖 Saved ${fullInfo.chapters?.length || 0} chapters successfully.`);
+                    // 2. THE SMART SKIP LOGIC
+                    if (savedChapterCount === scrapedChapterCount && scrapedChapterCount > 0) {
+                        console.log(`   ⏭️ SKIPPED: Already up to date (Has all ${savedChapterCount} chapters).`);
+                    } else {
+                        console.log(`   🆕 UPDATE FOUND: DB had ${savedChapterCount} chapters, now has ${scrapedChapterCount}! Saving...`);
+                        
+                        const { error } = await supabase.from('manga_links').upsert({ 
+                            title: manga.title.toLowerCase().trim(), 
+                            manga_id: manga.id, 
+                            provider: mangaread.name,
+                            chapters_data: fullInfo.chapters,
+                            updated_at: new Date()
+                        }, { onConflict: 'title, provider' });
+
+                        if (error) throw error;
+                        console.log(`   ✅ DB Updated successfully.`);
+                    }
 
                 } catch (err: any) {
-                    console.error(`   ❌ Failed to fetch info for ${manga.title}: ${err.message}`);
+                    console.error(`   ❌ Failed to process ${manga.title}: ${err.message}`);
                 }
                 
                 totalMined++;
@@ -51,7 +80,7 @@ async function mineTop300Manga() {
             }
             page++;
         }
-        console.log('\n🎉 Top 300 Daily Manga Miner completed successfully!');
+        console.log('\n🎉 Smart Daily Manga Miner completed successfully!');
     } catch (err: any) {
         console.error(`❌ Miner failed: ${err.message}`);
     }
