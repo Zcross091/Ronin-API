@@ -8,10 +8,14 @@ on:
         description: 'Manga title to mine'
         required: true
         default: 'Solo Leveling'
+      chapter:
+        description: 'Target chapter number'
+        required: true
+        default: '1'
 jobs:
   mine-manga:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25 # High timeout so it can background-cache the rest of the chapters
     steps:
       - uses: actions/checkout@v4
 
@@ -25,11 +29,14 @@ jobs:
       - name: Install ts-node globally
         run: npm install -g ts-node typescript
 
-      - name: Run Manga Miner
+      - name: Run Priority Manga Miner
         run: |
           QUERY="${{ github.event.client_payload.query || github.event.inputs.query }}"
-          echo "Mining for Manga: $QUERY"
-          ts-node manga_miner.ts "$QUERY"
+          CHAPTER="${{ github.event.client_payload.chapter || github.event.inputs.chapter }}"
+          echo "Mining for Manga: $QUERY | Priority Chapter: $CHAPTER"
+          
+          # Run the new prioritized on-demand script
+          ts-node on_demand_manga.ts "$QUERY" "$CHAPTER"
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
