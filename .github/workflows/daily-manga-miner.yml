@@ -8,7 +8,7 @@ on:
 jobs:
   mine-manga:
     runs-on: ubuntu-latest
-    timeout-minutes: 60 
+    timeout-minutes: 30 # You can safely drop the timeout now that we are only doing 100
     steps:
       - uses: actions/checkout@v4
 
@@ -23,7 +23,7 @@ jobs:
       - name: Install ts-node globally
         run: npm install -g ts-node typescript
 
-      - name: Run Smart Top 300 Manga Miner
+      - name: Run Smart Top 100 Manga Miner
         run: ts-node manga_miner.ts
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
