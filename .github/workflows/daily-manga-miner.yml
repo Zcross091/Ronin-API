@@ -1,14 +1,14 @@
 name: Daily Manga Miner
 on:
   schedule:
-    # 17:10 UTC is exactly 10:40 PM IST (UTC+5:30)
+    # Runs at 17:10 UTC (10:40 PM IST) every day
     - cron: '10 17 * * *'
   workflow_dispatch: # Allows manual trigger from the GitHub Actions tab
 
 jobs:
   mine-manga:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60 # Increased timeout since fetching 300 manga takes time
     steps:
       - uses: actions/checkout@v4
 
@@ -22,7 +22,7 @@ jobs:
       - name: Install ts-node globally
         run: npm install -g ts-node typescript
 
-      - name: Run Manga Miner
+      - name: Run Top 300 Manga Miner
         run: ts-node manga_miner.ts
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
