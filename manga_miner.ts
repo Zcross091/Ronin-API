@@ -1,80 +1,60 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import MangaDex from './providers/mangadex';
+import MangaRead from './providers/mangaread'; // Correct relative path from root
 
 dotenv.config();
 
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_KEY || '';
-
-if (!supabaseUrl || !supabaseKey) {
-    console.error('❌ Missing SUPABASE_URL or SUPABASE_KEY env variables.');
-    process.exit(1);
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey);
-const mangadex = new MangaDex();
-
-// Simple delay function to prevent rate limits
+const supabase = createClient(process.env.SUPABASE_URL || '', process.env.SUPABASE_KEY || '');
+const mangaread = new MangaRead();
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function saveMangaToSupabase(title: string, mangaId: string, provider: string) {
-    const { error } = await supabase.from('manga_links').upsert(
-        { title: title.toLowerCase().trim(), manga_id: mangaId, provider },
-        { onConflict: 'title, provider' }
-    );
-    if (error) {
-        console.error(`❌ Supabase manga error for ${title}:`, error.message);
-    } else {
-        console.log(`✅ Saved Manga: [${title}] (${provider})`);
-    }
-}
+async function mineTop300Manga() {
+    console.log('🚀 Starting Top 300 Manga Miner for MangaRead...');
+    
+    let totalMined = 0;
+    const targetAmount = 300;
+    let page = 1;
 
-async function mineTrendingManga() {
-    console.log('🚀 Starting Manga Miner...');
-    
-    // Check for search query argument (e.g., ts-node manga_miner.ts "One Piece")
-    const args = process.argv.slice(2);
-    const query = args[0] || '';
-    
     try {
-        if (query) {
-            console.log(`🔍 Fetching manga matching "${query}" from MangaDex...`);
-        } else {
-            console.log('🔍 Fetching top trending manga from MangaDex...');
-        }
-        
-        const searchResults = await mangadex.search(query, 1);
-        
-        const mangaList = searchResults.results.slice(0, 30); // Grab top 30
-        
-        console.log(`📚 Found ${mangaList.length} manga. Commencing deep dive...`);
-        
-        for (let i = 0; i < mangaList.length; i++) {
-            const manga = mangaList[i];
-            const title = typeof manga.title === 'string' ? manga.title : (manga.title.english || Object.values(manga.title)[0] || 'Unknown Title');
+        while (totalMined < targetAmount) {
+            console.log(`\n📄 Fetching trending page ${page}...`);
+            const mangaList = await mangaread.fetchTopManga(page);
             
-            console.log(`\n⏳ [${i+1}/${mangaList.length}] Deep diving into: ${title} (${manga.id})`);
-            
-            try {
-                // Fetch full info which includes all chapters
-                const fullInfo = await mangadex.fetchMangaInfo(manga.id);
-                console.log(`   📖 Fetched details & ${fullInfo.chapters?.length || 0} chapters successfully.`);
+            if (mangaList.length === 0) break; 
+
+            for (const manga of mangaList) {
+                if (totalMined >= targetAmount) break;
+
+                console.log(`⏳ [${totalMined + 1}/300] Deep diving into: ${manga.title}`);
+                try {
+                    // Fetch full info to get the chapter array
+                    const fullInfo = await mangaread.fetchMangaInfo(manga.id);
+                    
+                    // Upsert into Supabase
+                    const { error } = await supabase.from('manga_links').upsert({ 
+                        title: manga.title.toLowerCase().trim(), 
+                        manga_id: manga.id, 
+                        provider: mangaread.name,
+                        chapters_data: fullInfo.chapters,
+                        updated_at: new Date()
+                    }, { onConflict: 'title, provider' });
+
+                    if (error) throw error;
+                    console.log(`   📖 Saved ${fullInfo.chapters?.length || 0} chapters successfully.`);
+
+                } catch (err: any) {
+                    console.error(`   ❌ Failed to fetch info for ${manga.title}: ${err.message}`);
+                }
                 
-                // Save to database
-                await saveMangaToSupabase(title, manga.id, mangadex.name);
-            } catch (err: any) {
-                console.error(`   ❌ Failed to fetch info for ${title}: ${err.message}`);
+                totalMined++;
+                await delay(1500); // 1.5s delay to prevent IP bans
             }
-            
-            // Sleep for 2 seconds to avoid rate limiting
-            await delay(2000);
+            page++;
         }
-        
-        console.log('\n🎉 Daily Manga Miner completed successfully!');
+        console.log('\n🎉 Top 300 Daily Manga Miner completed successfully!');
     } catch (err: any) {
         console.error(`❌ Miner failed: ${err.message}`);
     }
 }
 
-mineTrendingManga();
+mineTop300Manga();
