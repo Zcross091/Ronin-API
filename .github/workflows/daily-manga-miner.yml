@@ -8,21 +8,22 @@ on:
 jobs:
   mine-manga:
     runs-on: ubuntu-latest
-    timeout-minutes: 60 # Increased timeout since fetching 300 manga takes time
+    timeout-minutes: 60 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm' # This caches node_modules so boot-up is instant
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci # Uses clean install from package-lock for faster execution
 
       - name: Install ts-node globally
         run: npm install -g ts-node typescript
 
-      - name: Run Top 300 Manga Miner
+      - name: Run Smart Top 300 Manga Miner
         run: ts-node manga_miner.ts
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
