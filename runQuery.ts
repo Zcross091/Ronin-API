@@ -291,88 +291,126 @@ async function mineFromAniwave(query: string, episodeStr: string): Promise<boole
     return success;
 }
 
-async function mineFromHianime(query: string, episodeStr: string): Promise<boolean> {
-    const epNum = parseInt(episodeStr) || 1;
-    console.log(`\n🔍 HiAnime Puppeteer search for: "${query}" Ep: ${epNum}`);
+async function mineFromHianimeDirect(query: string, episodeStr: string): Promise<boolean> {
+    console.log(`\n🚀 Starting HiAnime Direct Series Mine for: ${query} (Ep: ${episodeStr || 'All'})`);
     
     const browser = await puppeteer.launch({
         headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
     });
-
+    
     let success = false;
+    // Fallback to hianime.to if HIANIME_CLUSTER is empty
+    const domains = HIANIME_CLUSTER.length > 0 ? HIANIME_CLUSTER : ['https://hianime.to'];
 
-    for (const domain of HIANIME_CLUSTER) {
+    for (const domain of domains) {
+        const page = await browser.newPage();
         try {
+            // 1. Search for the Anime
             const searchUrl = `${domain}/search?keyword=${encodeURIComponent(query)}`;
-            console.log(`\n🌐 Searching: ${searchUrl}`);
+            console.log(`🌐 Searching: ${searchUrl}`);
+            await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+            await page.waitForSelector('.flw-item .film-name a', { timeout: 15000 });
             
-            const searchPage = await browser.newPage();
-            await searchPage.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-            
-            const firstResult = await searchPage.evaluate(() => {
-                const link = document.querySelector('.flw-item .film-name a') as HTMLAnchorElement;
-                return link ? link.href : null;
-            });
-            await searchPage.close();
+            const animeLink = await page.$eval('.flw-item .film-name a', (el: any) => el.href);
+            const animeId = animeLink.split('-').pop();
+            const fullTitle = await page.$eval('.flw-item .film-name a', (el: any) => el.textContent.trim());
 
-            if (!firstResult) {
-                console.log(`⚠️  No results on ${domain}`);
-                continue;
-            }
+            console.log(`🎯 Found Anime: ${fullTitle} (ID: ${animeId})`);
 
-            console.log(`🎯 Found anime on ${domain}: ${firstResult}`);
-            
+            // 2. Get Episode List via AJAX
+            await page.goto(`${domain}/ajax/v2/episode/list/${animeId}`, { waitUntil: 'networkidle2' });
+            const epListData = await page.evaluate(() => JSON.parse(document.body.innerText));
+
+            // Use a temporary page to parse the HTML from JSON
             const epPage = await browser.newPage();
-            // HiAnime usually requires going to the watch page directly if we want the player
-            // /watch/slug is usually /watch/slug?ep=id. Let's just click the "Watch now" or go to the link
-            await epPage.goto(firstResult, { waitUntil: 'domcontentloaded', timeout: 30000 });
-            
-            // Often the link from search is /anime/name. We need to find the "Watch Now" button
-            const watchUrl = await epPage.evaluate(() => {
-                const btn = document.querySelector('#ani_detail .film-buttons a.btn-play') as HTMLAnchorElement;
-                return btn ? btn.href : null;
-            }) || firstResult;
-
-            if (watchUrl !== firstResult) {
-                await epPage.goto(watchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-            }
-
-            await epPage.waitForSelector('.ss-list a.ssl-item.ep-item', { timeout: 15000 }).catch(() => {});
-            
-            const episodeUrl = await epPage.evaluate((ep) => {
-                const eps = Array.from(document.querySelectorAll('.ss-list a.ssl-item.ep-item')) as HTMLAnchorElement[];
-                const target = eps.find(e => e.getAttribute('data-number') === ep.toString());
-                return target ? target.href : null;
-            }, epNum);
-
-            if (!episodeUrl) {
-                console.log(`⚠️ Episode ${epNum} not found on ${domain}`);
-                await epPage.close();
-                continue;
-            }
-
-            console.log(`🎬 Go to Episode: ${episodeUrl}`);
-            await epPage.goto(episodeUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-
-            await epPage.waitForSelector('#iframe-embed', { timeout: 15000 }).catch(() => {});
-            
-            const iframeSrc = await epPage.evaluate(() => {
-                const iframe = document.querySelector('#iframe-embed') as HTMLIFrameElement;
-                return iframe ? iframe.src : null;
+            await epPage.setContent(epListData.html);
+            const episodes = await epPage.evaluate(() => {
+                return Array.from(document.querySelectorAll('.detail-en-list .item')).map(el => ({
+                    id: el.getAttribute('data-id'),
+                    num: el.getAttribute('data-number'),
+                    title: el.getAttribute('title')
+                }));
             });
-
             await epPage.close();
 
-            if (iframeSrc) {
-                console.log(`✅ Found embed: ${iframeSrc}`);
-                await saveToSupabase(query, epNum, 'embed', iframeSrc);
-                success = true;
-                break;
+            console.log(`📂 Total Episodes found: ${episodes.length}`);
+
+            let episodesToMine = episodes;
+            if (episodeStr) {
+                const targetEp = parseInt(episodeStr);
+                episodesToMine = episodes.filter(ep => parseInt(ep.num || '') === targetEp);
+                if (episodesToMine.length === 0) {
+                    console.log(`⚠️ Requested episode ${episodeStr} not found in episode list.`);
+                }
+            }
+
+            // 3. Loop through episodes and extract direct links & iframe links
+            for (const ep of episodesToMine) {
+                if (!ep.num || !ep.id) continue;
+                try {
+                    console.log(`🔍 Mining Episode ${ep.num}...`);
+
+                    // Intercept network requests to catch the .m3u8 stream
+                    await page.setRequestInterception(true);
+                    let directUrl: string | null = null;
+
+                    const requestHandler = (request: any) => {
+                        const url = request.url();
+                        if (url.includes('.m3u8') || (url.includes('source') && url.includes('.mp4'))) {
+                            directUrl = url;
+                        }
+                        request.continue();
+                    };
+
+                    page.on('request', requestHandler);
+
+                    // Navigate to the episode page
+                    const epUrl = `${domain}/watch/${animeId}?ep=${ep.id}`;
+                    await page.goto(epUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+
+                    // Small delay to let the player load and trigger requests
+                    await new Promise(r => setTimeout(r, 6000));
+
+                    // Grab iframe embed URL too
+                    const iframeSrc = await page.evaluate(() => {
+                        const iframe = document.querySelector('#iframe-embed') as HTMLIFrameElement;
+                        return iframe ? iframe.src : null;
+                    });
+
+                    // Save direct stream url if found
+                    if (directUrl) {
+                        console.log(`✅ SUCCESS: Ep ${ep.num} direct stream -> ${directUrl}`);
+                        await saveToSupabase(query, parseInt(ep.num || ''), 'm3u8', directUrl);
+                        success = true;
+                    } else {
+                        console.log(`⚠️ Could not find direct stream for Ep ${ep.num}`);
+                    }
+
+                    // Save embed iframe if found
+                    if (iframeSrc) {
+                        console.log(`✅ SUCCESS: Ep ${ep.num} iframe -> ${iframeSrc}`);
+                        await saveToSupabase(query, parseInt(ep.num || ''), 'embed', iframeSrc);
+                        success = true;
+                    }
+
+                    // Clean up listener for next episode
+                    page.off('request', requestHandler);
+                    await page.setRequestInterception(false);
+
+                } catch (epErr: any) {
+                    console.error(`❌ Error mining Episode ${ep.num}:`, epErr.message);
+                }
+            }
+
+            if (success) {
+                await page.close();
+                break; // Stop after first successful domain
             }
         } catch (e: any) {
             console.log(`❌ ${domain} failed: ${e.message}`);
         }
+        await page.close();
     }
 
     await browser.close();
@@ -389,26 +427,31 @@ async function mineFromHianime(query: string, episodeStr: string): Promise<boole
             process.exit(1);
         }
     } else if (serverStr === '3') {
-        const success = await mineFromHianime(query, episodeStr);
+        const success = await mineFromHianimeDirect(query, episodeStr);
         if (!success) {
             console.error(`❌ HiAnime failed for: "${query}"`);
             process.exit(1);
         }
     } else {
-        // Run all miners! We run them in two batches to avoid crashing the runner with too many browsers.
-        console.log(`\n⏳ Batch 1: Mining GogoAnime & Nyaa...`);
-        const [gogoSuccess, nyaaSuccess] = await Promise.all([
-            mineFromGogo(query),
-            mineFromNyaa(query)
+        // Run prioritized HiAnime Direct miner first, and fallback to GogoAnime
+        console.log(`\n⏳ Step 1: Trying HiAnime Direct Scraper...`);
+        const hianimeDirectSuccess = await mineFromHianimeDirect(query, episodeStr);
+        
+        let gogoSuccess = false;
+        if (!hianimeDirectSuccess) {
+            console.log(`\n⚠️ HiAnime Direct failed or returned no episodes. Falling back to GogoAnime...`);
+            gogoSuccess = await mineFromGogo(query);
+        } else {
+            console.log(`\n🎉 HiAnime Direct successfully mined episodes. Skipping GogoAnime fallback.`);
+        }
+
+        console.log(`\n⏳ Step 2: Mining Nyaa & Aniwave (As alternatives)...`);
+        const [nyaaSuccess, aniwaveSuccess] = await Promise.all([
+            mineFromNyaa(query),
+            mineFromAniwave(query, episodeStr)
         ]);
 
-        console.log(`\n⏳ Batch 2: Mining Aniwave & HiAnime...`);
-        const [aniwaveSuccess, hianimeSuccess] = await Promise.all([
-            mineFromAniwave(query, episodeStr),
-            mineFromHianime(query, episodeStr)
-        ]);
-
-        if (!gogoSuccess && !nyaaSuccess && !aniwaveSuccess && !hianimeSuccess) {
+        if (!hianimeDirectSuccess && !gogoSuccess && !nyaaSuccess && !aniwaveSuccess) {
             console.error(`❌ All sources failed for: "${query}"`);
             process.exit(1);
         }

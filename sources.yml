@@ -1,0 +1,14 @@
+anime:
+  - name: HiAnime
+    url: >-
+      https://raw.githubusercontent.com/roshancodespace/Anime-Sources/main/hianime.js
+  - name: GogoAnime
+    url: >-
+      https://raw.githubusercontent.com/roshancodespace/Anime-Sources/main/gogo.js
+manga:
+  - name: MangaDex
+    url: >-
+      https://raw.githubusercontent.com/roshancodespace/Manga-Sources/main/mangadex.js
+  - name: MangaPill
+    url: >-
+      https://raw.githubusercontent.com/roshancodespace/Manga-Sources/main/mangapill.js

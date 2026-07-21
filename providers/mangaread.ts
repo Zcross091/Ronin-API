@@ -1,7 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import MangaParser from '../models/manga-parser';
-import { IMangaInfo, IMangaChapterPage, IMangaResult, ISearch, IMangaChapter } from '../models/types';
+import { IMangaInfo, IMangaChapterPage, IMangaResult, ISearch, IMangaChapter, MediaStatus } from '../models/types';
 
 class MangaRead extends MangaParser {
   override readonly name = 'MangaRead';
@@ -32,7 +32,7 @@ class MangaRead extends MangaParser {
             id,
             title,
             image,
-            status: 'Ongoing', 
+            status: MediaStatus.ONGOING, 
             altTitles: [],
             description: ''
           });
@@ -59,7 +59,7 @@ class MangaRead extends MangaParser {
         id,
         title: titleNode.text().trim(),
         image: $(el).find('img').attr('data-src') || $(el).find('img').attr('src') || '',
-        altTitles: [], description: '', status: ''
+        altTitles: [], description: '', status: MediaStatus.UNKNOWN
       });
     });
     return results;
@@ -94,7 +94,7 @@ class MangaRead extends MangaParser {
         description,
         image,
         chapters: chapters.reverse(), // Madara themes list newest first, reverse for chronological
-        genres: [], authors: [], altTitles: [], status: 'Ongoing'
+        genres: [], authors: [], altTitles: [], status: MediaStatus.ONGOING
       };
     } catch (err: any) {
       throw new Error(`MangaRead fetchInfo failed: ${err.message}`);

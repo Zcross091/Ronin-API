@@ -44,7 +44,8 @@ async function mineTop100Manga() {
             for (const manga of mangaList) {
                 if (totalMined >= targetAmount) break;
 
-                console.log(`⏳ [${totalMined + 1}/100] Checking: ${manga.title}`);
+                const mangaTitle = typeof manga.title === 'string' ? manga.title : (manga.title.english || Object.values(manga.title)[0] || 'Unknown Title');
+                console.log(`⏳ [${totalMined + 1}/100] Checking: ${mangaTitle}`);
                 try {
                     // Fetch the latest info from the website
                     const fullInfo = await mangaread.fetchMangaInfo(manga.id);
@@ -60,7 +61,7 @@ async function mineTop100Manga() {
                         console.log(`   🆕 UPDATE FOUND: DB had ${savedChapterCount} chapters, now has ${scrapedChapterCount}! Saving...`);
                         
                         const { error } = await supabase.from('manga_links').upsert({ 
-                            title: manga.title.toLowerCase().trim(), 
+                            title: mangaTitle.toLowerCase().trim(), 
                             manga_id: manga.id, 
                             provider: mangaread.name,
                             chapters_data: fullInfo.chapters,
@@ -72,7 +73,7 @@ async function mineTop100Manga() {
                     }
 
                 } catch (err: any) {
-                    console.error(`   ❌ Failed to process ${manga.title}: ${err.message}`);
+                    console.error(`   ❌ Failed to process ${mangaTitle}: ${err.message}`);
                 }
                 
                 totalMined++;
