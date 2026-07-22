@@ -319,8 +319,13 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
             console.log(`🎯 Found Anime: ${fullTitle} (ID: ${animeId})`);
 
             // 2. Get Episode List via AJAX
-            await page.goto(`${domain}/ajax/v2/episode/list/${animeId}`, { waitUntil: 'networkidle2' });
-            const epListData = await page.evaluate(() => JSON.parse(document.body.innerText));
+            const ajaxUrl = `${domain}/ajax/v2/episode/list/${animeId}`;
+            const epListData = await page.evaluate(async (url) => {
+                const response = await fetch(url, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+                });
+                return await response.json();
+            }, ajaxUrl);
 
             // Use a temporary page to parse the HTML from JSON
             const epPage = await browser.newPage();
