@@ -142,9 +142,13 @@ async function mineFromGogo(query: string): Promise<boolean> {
             const queryBase = query.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
 
             const searchResults: string[] = await searchPage.evaluate((base: string) => {
-                const links = Array.from(document.querySelectorAll('p.name a, .items li a, a')) as HTMLAnchorElement[];
+                const primaryLinks = Array.from(document.querySelectorAll('p.name a, .items li a')) as HTMLAnchorElement[];
+                const allLinks = Array.from(document.querySelectorAll('a')) as HTMLAnchorElement[];
+                
+                const linksToSearch = primaryLinks.length > 0 ? primaryLinks : allLinks;
+                
                 return [...new Set(
-                    links
+                    linksToSearch
                         .filter(l => l.href && (l.href.includes('/category/') || l.href.includes('/anime/')) && l.href.toLowerCase().includes(base))
                         .map(l => l.href)
                 )];
@@ -240,9 +244,13 @@ async function mineFromAniwave(query: string, episodeStr: string): Promise<boole
                         const querySlug = q.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
                         // Look for a link that has /anime/ or /watch/ and contains the title slug
                         const target = links.find(l => 
-                            l.href && (l.href.includes('/anime/') || l.href.includes('/watch/') || l.href.includes('/tv/')) && 
+                            l.href && 
+                            (l.href.includes('/anime/') || l.href.includes('/watch/') || l.href.includes('/tv/')) && 
                             l.href.toLowerCase().includes(querySlug) && 
-                            !l.href.includes('/search')
+                            !l.href.includes('/search') &&
+                            !l.href.includes('?s=') &&
+                            !l.href.includes('?keyword=') &&
+                            l.href !== window.location.href
                         );
                         return target ? target.href : null;
                     }, query);
@@ -357,13 +365,20 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
                 try {
                     await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
                     animeLink = await page.evaluate((q) => {
-                        const links = Array.from(document.querySelectorAll('.flw-item .film-name a, .film-detail .film-name a, .item a.name, a')) as HTMLAnchorElement[];
+                        // First see if there is an explicit anime card link (highly reliable)
+                        const primaryLinks = Array.from(document.querySelectorAll('.flw-item .film-name a, .film-detail .film-name a, .item a.name')) as HTMLAnchorElement[];
+                        const allLinks = Array.from(document.querySelectorAll('a')) as HTMLAnchorElement[];
+                        
+                        const linksToSearch = primaryLinks.length > 0 ? primaryLinks : allLinks;
+                        
                         const querySlug = q.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-                        const target = links.find(l => 
+                        const target = linksToSearch.find(l => 
                             l.href && 
-                            (l.href.includes('/watch/') || l.href.includes('/anime/') || l.href.includes('/tv/')) && 
                             l.href.toLowerCase().includes(querySlug) && 
-                            !l.href.includes('/search')
+                            !l.href.includes('/search') &&
+                            !l.href.includes('?s=') &&
+                            !l.href.includes('?keyword=') &&
+                            l.href !== window.location.href
                         );
                         return target ? target.href : null;
                     }, query);
