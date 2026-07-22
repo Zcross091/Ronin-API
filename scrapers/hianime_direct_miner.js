@@ -19,11 +19,11 @@ async function mineSeries(query) {
 
     try {
         // 1. Search for the Anime
-        await page.goto(`https://hianime.to/search?keyword=${encodeURIComponent(query)}`, { waitUntil: 'networkidle2' });
-        await page.waitForSelector('.film-detail .film-name a');
-        const animeLink = await page.$eval('.film-detail .film-name a', el => el.href);
+        await page.goto(`https://hianime.to/search?keyword=${encodeURIComponent(query)}`, { waitUntil: 'networkidle2', timeout: 30000 });
+        await page.waitForSelector('.flw-item .film-name a, .film-detail .film-name a', { timeout: 15000 });
+        const animeLink = await page.$eval('.flw-item .film-name a, .film-detail .film-name a', el => el.href);
         const animeId = animeLink.split('-').pop();
-        const fullTitle = await page.$eval('.film-detail .film-name a', el => el.textContent.trim());
+        const fullTitle = await page.$eval('.flw-item .film-name a, .film-detail .film-name a', el => el.textContent.trim());
 
         console.log(`📌 Found Anime: ${fullTitle} (ID: ${animeId})`);
 
