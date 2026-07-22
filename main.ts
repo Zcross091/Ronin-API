@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import gogoanime from './routes/gogoanime';
 import manga from './routes/manga';
+import miningRoutes from './routes/mining';
 import { GogoCDN } from './extractors';
 import { scrapeGogoanimeLight } from './scrapers/gogoanimeLight';
 
@@ -25,6 +26,7 @@ const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supaba
 const fastify = Fastify({ logger: true });
 export const redis = null;
 fastify.register(manga, { prefix: '/manga' });
+fastify.register(miningRoutes);
 
 async function saveToSupabase(title: string, episode: number, type: string, url: string) {
     if (!supabase) return;
