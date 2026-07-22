@@ -438,23 +438,37 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
 
             // Generic Fallback if AJAX failed
             if (episodesToMine.length === 0) {
-                const targetEp = parseInt(episodeStr) || 1;
-                await page.goto(animeLink, { waitUntil: 'domcontentloaded', timeout: 30000 });
-                const episodeUrl = await page.evaluate((ep) => {
-                    const eps = Array.from(document.querySelectorAll('.episodes a, .eplister ul li a, .ss-list a.ep-item, a')) as HTMLAnchorElement[];
-                    const target = eps.find(e => {
+                await page.goto(animeLink, { waitUntil: 'networkidle2', timeout: 30000 });
+                await new Promise(r => setTimeout(r, 2000));
+                
+                const parsedEps = await page.evaluate(() => {
+                    const eps = Array.from(document.querySelectorAll('.episodes a, .eplister ul li a, .ss-list a.ep-item, .ss-list a, a')) as HTMLAnchorElement[];
+                    const parsedEpisodes: { num: string, url: string }[] = [];
+                    for (const e of eps) {
                         const text = e.innerText.trim().toLowerCase();
                         const href = e.href.toLowerCase();
-                        return text === ep.toString() || text === `ep ${ep}` || text === `episode ${ep}` || href.endsWith(`-episode-${ep}`) || href.endsWith(`-ep-${ep}`);
-                    });
-                    return target ? target.href : null;
-                }, targetEp);
+                        let epNum = e.getAttribute('data-num') || e.getAttribute('data-number') || e.getAttribute('data-ep');
+                        
+                        if (!epNum) {
+                            const match = text.match(/ep(?:isode)?\s*(\d+)/) || href.match(/-ep(?:isode)?-(\d+)/) || href.match(/\/ep-(\d+)/);
+                            if (match) epNum = match[1];
+                        }
+                        
+                        if (epNum && e.href && !e.href.includes('/search') && !e.href.includes('?keyword=')) {
+                            parsedEpisodes.push({ num: epNum, url: e.href });
+                        }
+                    }
+                    return Array.from(new Map(parsedEpisodes.map(item => [item.num, item])).values());
+                });
                 
-                if (episodeUrl) {
-                    episodesToMine.push({ num: targetEp.toString(), url: episodeUrl });
+                if (parsedEps.length > 0) {
+                    // Sort numerically
+                    episodesToMine = parsedEps.sort((a, b) => parseInt(a.num) - parseInt(b.num));
                 } else {
-                    // Assume animeLink is the episode itself or a movie
-                    episodesToMine.push({ num: targetEp.toString(), url: animeLink });
+                    // Assume animeLink is a single episode or a movie, try to extract ep num from URL
+                    const match = animeLink.match(/-ep(?:isode)?-(\d+)/) || animeLink.match(/\/ep-(\d+)/);
+                    const epNum = match ? match[1] : (episodeStr || '1');
+                    episodesToMine.push({ num: epNum, url: animeLink });
                 }
             }
 
