@@ -59,14 +59,14 @@ async function scrapeAnimePage(browser: any, animeUrl: string, domain: string): 
     try {
         await page.goto(animeUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-        const slugMatch = animeUrl.match(/\/anime\/(.*?)\/?$/i);
-        const slugBase = slugMatch ? slugMatch[1].split('-')[0] : '';
+        const slugMatch = animeUrl.match(/\/(?:anime|category)\/(.*?)\/?$/i);
+        const slugBase = slugMatch ? slugMatch[1].split('-')[0].toLowerCase() : '';
 
         let episodeLinks: string[] = await page.evaluate((base: string) => {
             const links = Array.from(document.querySelectorAll('a')) as HTMLAnchorElement[];
             return [...new Set(
                 links
-                    .filter(l => l.href && l.href.includes('-episode-') && l.href.includes(base))
+                    .filter(l => l.href && (l.href.includes('-episode-') || l.href.includes('ep-')) && l.href.toLowerCase().includes(base))
                     .map(l => l.href)
             )];
         }, slugBase);
@@ -133,7 +133,7 @@ async function mineFromGogo(query: string): Promise<boolean> {
 
     for (const domain of GOGO_DOMAINS) {
         try {
-            const searchUrl = `${domain}/?s=${encodeURIComponent(query)}`;
+            const searchUrl = `${domain}/search.html?keyword=${encodeURIComponent(query)}`;
             console.log(`\n🌐 Searching: ${searchUrl}`);
 
             const searchPage = await browser.newPage();
@@ -142,10 +142,10 @@ async function mineFromGogo(query: string): Promise<boolean> {
             const queryBase = query.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
 
             const searchResults: string[] = await searchPage.evaluate((base: string) => {
-                const links = Array.from(document.querySelectorAll('a')) as HTMLAnchorElement[];
+                const links = Array.from(document.querySelectorAll('p.name a, .items li a, a')) as HTMLAnchorElement[];
                 return [...new Set(
                     links
-                        .filter(l => l.href && l.href.includes('/anime/') && l.href.toLowerCase().includes(base))
+                        .filter(l => l.href && (l.href.includes('/category/') || l.href.includes('/anime/')) && l.href.toLowerCase().includes(base))
                         .map(l => l.href)
                 )];
             }, queryBase);
@@ -221,16 +221,38 @@ async function mineFromAniwave(query: string, episodeStr: string): Promise<boole
 
     for (const domain of ANIWAVE_CLUSTER) {
         try {
-            const searchUrl = `${domain}/?s=${encodeURIComponent(query)}`;
-            console.log(`\n🌐 Searching: ${searchUrl}`);
+            // Try multiple search URL patterns to support arbitrary domains
+            const searchUrls = [
+                `${domain}/?s=${encodeURIComponent(query)}`,
+                `${domain}/search?keyword=${encodeURIComponent(query)}`,
+                `${domain}/filter?keyword=${encodeURIComponent(query)}`
+            ];
             
-            const searchPage = await browser.newPage();
-            await searchPage.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-            
-            const firstResult = await searchPage.evaluate(() => {
-                const link = document.querySelector('.item a.name, .bsx a, .film-name a') as HTMLAnchorElement;
-                return link ? link.href : null;
-            });
+            let searchPage = await browser.newPage();
+            let firstResult: string | null = null;
+
+            for (const searchUrl of searchUrls) {
+                console.log(`\n🌐 Searching: ${searchUrl}`);
+                try {
+                    await searchPage.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+                    firstResult = await searchPage.evaluate((q) => {
+                        const links = Array.from(document.querySelectorAll('.item a.name, .bsx a, .film-name a, .card a, a')) as HTMLAnchorElement[];
+                        const querySlug = q.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+                        // Look for a link that has /anime/ or /watch/ and contains the title slug
+                        const target = links.find(l => 
+                            l.href && (l.href.includes('/anime/') || l.href.includes('/watch/') || l.href.includes('/tv/')) && 
+                            l.href.toLowerCase().includes(querySlug) && 
+                            !l.href.includes('/search')
+                        );
+                        return target ? target.href : null;
+                    }, query);
+
+                    if (firstResult) break;
+                } catch (e) {
+                    continue; // try next search pattern
+                }
+            }
+
             await searchPage.close();
 
             if (!firstResult) {
@@ -247,21 +269,28 @@ async function mineFromAniwave(query: string, episodeStr: string): Promise<boole
             await epPage.waitForSelector('.episodes a, .eplister ul li a, .ss-list a', { timeout: 10000 }).catch(() => {});
             
             const episodeUrl = await epPage.evaluate((ep) => {
-                // Common selectors for animestream, wp themes, and aniwave clones
-                const eps = Array.from(document.querySelectorAll('.episodes a, .eplister ul li a, .ss-list a.ep-item')) as HTMLAnchorElement[];
-                const target = eps.find(e => 
-                    e.getAttribute('data-num') === ep.toString() || 
-                    e.getAttribute('data-number') === ep.toString() ||
-                    e.innerText.trim().includes(ep.toString()) ||
-                    e.querySelector('.epl-num')?.textContent?.includes(ep.toString())
-                );
+                // Heuristic mapping for standard clone themes
+                const eps = Array.from(document.querySelectorAll('.episodes a, .eplister ul li a, .ss-list a.ep-item, a')) as HTMLAnchorElement[];
+                const target = eps.find(e => {
+                    const text = e.innerText.trim().toLowerCase();
+                    const href = e.href.toLowerCase();
+                    return (
+                        e.getAttribute('data-num') === ep.toString() || 
+                        e.getAttribute('data-number') === ep.toString() ||
+                        text === ep.toString() ||
+                        text === `ep ${ep}` ||
+                        text === `episode ${ep}` ||
+                        href.endsWith(`-episode-${ep}`) ||
+                        href.endsWith(`-ep-${ep}`) ||
+                        e.querySelector('.epl-num')?.textContent?.trim() === ep.toString()
+                    );
+                });
                 return target ? target.href : null;
             }, epNum);
 
             if (!episodeUrl) {
-                console.log(`⚠️ Episode ${epNum} not found on ${domain}`);
-                // if not found, we might already be on the episode page (if search returned episode direct link)
-                // Let's just check if there's an iframe here
+                console.log(`⚠️ Episode ${epNum} link not explicitly found on ${domain}`);
+                // Assume we might already be on the episode page or it's a movie with a direct iframe
             } else {
                 console.log(`🎬 Go to Episode: ${episodeUrl}`);
                 await epPage.goto(episodeUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -270,8 +299,18 @@ async function mineFromAniwave(query: string, episodeStr: string): Promise<boole
             await epPage.waitForSelector('iframe', { timeout: 15000 }).catch(() => {});
             
             const iframeSrc = await epPage.evaluate(() => {
-                const iframe = document.querySelector('iframe') as HTMLIFrameElement;
-                return iframe ? iframe.src : null;
+                const iframes = Array.from(document.querySelectorAll('iframe')) as HTMLIFrameElement[];
+                // Find primary video iframe (ignoring ads/trackers)
+                const player = iframes.find(i => i.src && (
+                    i.src.includes('embed') || 
+                    i.src.includes('vid') || 
+                    i.src.includes('player') || 
+                    i.src.includes('stream') || 
+                    i.src.includes('mega') ||
+                    i.src.includes('drive') ||
+                    i.src.includes('php?id=')
+                ));
+                return player ? player.src : null;
             });
 
             await epPage.close();
@@ -307,42 +346,99 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
         const page = await browser.newPage();
         try {
             // 1. Search for the Anime
-            const searchUrl = `${domain}/search?keyword=${encodeURIComponent(query)}`;
-            console.log(`🌐 Searching: ${searchUrl}`);
-            await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 30000 });
-            await page.waitForSelector('.flw-item .film-name a', { timeout: 15000 });
+            let searchUrls = [
+                `${domain}/search?keyword=${encodeURIComponent(query)}`,
+                `${domain}/?s=${encodeURIComponent(query)}`
+            ];
             
-            const animeLink = await page.$eval('.flw-item .film-name a', (el: any) => el.href);
-            const animeId = animeLink.split('-').pop();
-            const fullTitle = await page.$eval('.flw-item .film-name a', (el: any) => el.textContent.trim());
+            let animeLink: string | null = null;
+            for (const searchUrl of searchUrls) {
+                console.log(`🌐 Searching: ${searchUrl}`);
+                try {
+                    await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+                    animeLink = await page.evaluate((q) => {
+                        const links = Array.from(document.querySelectorAll('.flw-item .film-name a, .film-detail .film-name a, .item a.name, a')) as HTMLAnchorElement[];
+                        const querySlug = q.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+                        const target = links.find(l => 
+                            l.href && 
+                            (l.href.includes('/watch/') || l.href.includes('/anime/') || l.href.includes('/tv/')) && 
+                            l.href.toLowerCase().includes(querySlug) && 
+                            !l.href.includes('/search')
+                        );
+                        return target ? target.href : null;
+                    }, query);
+                    if (animeLink) break;
+                } catch (e) {
+                    continue;
+                }
+            }
 
-            console.log(`🎯 Found Anime: ${fullTitle} (ID: ${animeId})`);
+            if (!animeLink) {
+                console.log(`⚠️  No results on ${domain}`);
+                continue;
+            }
 
-            const ajaxUrl = `${domain}/ajax/v2/episode/list/${animeId}`;
-            const epListData = await page.evaluate((url: string) => {
-                return fetch(url, {
-                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
-                }).then(res => res.json());
-            }, ajaxUrl);
+            console.log(`🎯 Found Anime Link: ${animeLink}`);
+            const animeId = animeLink.split('-').pop() || '';
 
-            // Use a temporary page to parse the HTML from JSON
-            const epPage = await browser.newPage();
-            await epPage.setContent(epListData.html);
-            const episodes = await epPage.evaluate(() => {
-                return Array.from(document.querySelectorAll('.detail-en-list .item')).map(el => ({
-                    id: el.getAttribute('data-id'),
-                    num: el.getAttribute('data-number'),
-                    title: el.getAttribute('title')
-                }));
-            });
-            await epPage.close();
+            let episodesToMine: any[] = [];
+            
+            try {
+                // Try HiAnime AJAX episode list
+                const ajaxUrl = `${domain}/ajax/v2/episode/list/${animeId}`;
+                const epListData = await page.evaluate((url: string) => {
+                    return fetch(url, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+                    }).then(res => res.json());
+                }, ajaxUrl);
 
-            console.log(`📂 Total Episodes found: ${episodes.length}`);
+                if (epListData && epListData.html) {
+                    const epPage = await browser.newPage();
+                    await epPage.setContent(epListData.html);
+                    const episodes = await epPage.evaluate(() => {
+                        return Array.from(document.querySelectorAll('.detail-en-list .item')).map(el => ({
+                            id: el.getAttribute('data-id'),
+                            num: el.getAttribute('data-number'),
+                            title: el.getAttribute('title')
+                        }));
+                    });
+                    await epPage.close();
+                    episodesToMine = episodes;
+                }
+            } catch (e) {
+                console.log(`⚠️ HiAnime AJAX fetch failed, attempting generic fallback...`);
+            }
 
-            let episodesToMine = episodes;
-            if (episodeStr) {
+            // Generic Fallback if AJAX failed
+            if (episodesToMine.length === 0) {
+                const targetEp = parseInt(episodeStr) || 1;
+                await page.goto(animeLink, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                const episodeUrl = await page.evaluate((ep) => {
+                    const eps = Array.from(document.querySelectorAll('.episodes a, .eplister ul li a, .ss-list a.ep-item, a')) as HTMLAnchorElement[];
+                    const target = eps.find(e => {
+                        const text = e.innerText.trim().toLowerCase();
+                        const href = e.href.toLowerCase();
+                        return text === ep.toString() || text === `ep ${ep}` || text === `episode ${ep}` || href.endsWith(`-episode-${ep}`) || href.endsWith(`-ep-${ep}`);
+                    });
+                    return target ? target.href : null;
+                }, targetEp);
+                
+                if (episodeUrl) {
+                    episodesToMine.push({ num: targetEp.toString(), url: episodeUrl });
+                } else {
+                    // Assume animeLink is the episode itself or a movie
+                    episodesToMine.push({ num: targetEp.toString(), url: animeLink });
+                }
+            }
+
+            console.log(`📂 Total Episodes found: ${episodesToMine.length}`);
+
+            if (episodeStr && episodesToMine.length > 0) {
                 const targetEp = parseInt(episodeStr);
-                episodesToMine = episodes.filter(ep => parseInt(ep.num || '') === targetEp);
+                // Filter only if we have a full list from AJAX
+                if (episodesToMine.length > 1) {
+                    episodesToMine = episodesToMine.filter(ep => parseInt(ep.num || '') === targetEp);
+                }
                 if (episodesToMine.length === 0) {
                     console.log(`⚠️ Requested episode ${episodeStr} not found in episode list.`);
                 }
@@ -350,11 +446,10 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
 
             // 3. Loop through episodes and extract direct links & iframe links
             for (const ep of episodesToMine) {
-                if (!ep.num || !ep.id) continue;
+                if (!ep.num) continue;
                 try {
                     console.log(`🔍 Mining Episode ${ep.num}...`);
 
-                    // Intercept network requests to catch the .m3u8 stream
                     await page.setRequestInterception(true);
                     let directUrl: string | null = null;
 
@@ -369,16 +464,25 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
                     page.on('request', requestHandler);
 
                     // Navigate to the episode page
-                    const epUrl = `${domain}/watch/${animeId}?ep=${ep.id}`;
-                    await page.goto(epUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+                    const epUrl = ep.url ? ep.url : `${domain}/watch/${animeId}?ep=${ep.id}`;
+                    await page.goto(epUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-                    // Small delay to let the player load and trigger requests
+                    // Delay to trigger video requests
                     await new Promise(r => setTimeout(r, 6000));
 
-                    // Grab iframe embed URL too
+                    // Grab generic iframe embed
                     const iframeSrc = await page.evaluate(() => {
-                        const iframe = document.querySelector('#iframe-embed') as HTMLIFrameElement;
-                        return iframe ? iframe.src : null;
+                        const iframes = Array.from(document.querySelectorAll('iframe')) as HTMLIFrameElement[];
+                        const player = iframes.find(i => i.src && (
+                            i.src.includes('embed') || 
+                            i.src.includes('vid') || 
+                            i.src.includes('player') || 
+                            i.src.includes('stream') || 
+                            i.src.includes('mega') ||
+                            i.src.includes('drive') ||
+                            i.src.includes('php?id=')
+                        ));
+                        return player ? player.src : null;
                     });
 
                     // Save direct stream url if found
