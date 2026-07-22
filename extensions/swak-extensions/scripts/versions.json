@@ -1,0 +1,146 @@
+{
+    "manga": {
+        "Atsumaru": {
+            "name": "Atsumaru",
+            "version": "0.0.1",
+            "langs": "en",
+            "lastUpd": 1782987882.185013
+        },
+        "WeLoMa": {
+            "name": "WeLoMa",
+            "version": "1.0.0",
+            "langs": "ja",
+            "lastUpd": 1761760611.599596
+        },
+        "Mangapark": {
+            "name": "Mangapark",
+            "version": "1.0.1",
+            "langs": "en",
+            "lastUpd": 1758079504.835998
+        },
+        "Mangapill": {
+            "name": "Mangapill",
+            "version": "1.0.4",
+            "langs": "en",
+            "lastUpd": 1758079504.835998
+        },
+        "ReadComicOnline": {
+            "name": "ReadComicOnline",
+            "version": "0.3.0",
+            "langs": "en",
+            "lastUpd": 1753526709.455681
+        },
+        "Weeb Central": {
+            "name": "Weeb Central",
+            "version": "0.1.0",
+            "langs": "en",
+            "lastUpd": 1741990440
+        }
+    },
+    "anime": {
+        "AniDB": {
+            "name": "AniDB",
+            "version": "1.0.2",
+            "langs": "all",
+            "lastUpd": 1781089725.310316
+        },
+        "Animetsu": {
+            "name": "Animetsu",
+            "version": "1.2.2",
+            "langs": "all",
+            "lastUpd": 1780821909.328045
+        },
+        "Anikoto": {
+            "name": "Anikoto",
+            "version": "1.0.2",
+            "langs": "all",
+            "lastUpd": 1780745563.603563
+        },
+        "Senshi": {
+            "name": "Senshi",
+            "version": "1.0.1",
+            "langs": "all",
+            "lastUpd": 1778481909.284884
+        },
+        "Sudatchi": {
+            "name": "Sudatchi",
+            "version": "2.0.1",
+            "langs": "en",
+            "lastUpd": 1776836230.987179
+        },
+        "Animeonsen": {
+            "name": "Animeonsen",
+            "version": "1.0.5",
+            "langs": "en, ja",
+            "lastUpd": 1776836230.987179
+        },
+        "Moviesda": {
+            "name": "Moviesda",
+            "version": "1.2.2",
+            "langs": "ta",
+            "lastUpd": 1764609098.718991
+        },
+        "SubsPlease": {
+            "name": "SubsPlease",
+            "version": "0.0.5",
+            "langs": "en",
+            "lastUpd": 1753293069.296975
+        },
+        "AnimeParadise": {
+            "name": "AnimeParadise",
+            "version": "0.1.0",
+            "langs": "en",
+            "lastUpd": 1750509383.278437
+        },
+        "AnimeZZ": {
+            "name": "AnimeZZ",
+            "version": "1.1.1",
+            "langs": "en",
+            "lastUpd": 1750504671.044623
+        },
+        "Autoembed": {
+            "name": "Autoembed",
+            "version": "1.3.3",
+            "langs": "all",
+            "lastUpd": 1748094760.694626
+        },
+        "AnimeGG": {
+            "name": "AnimeGG",
+            "version": "1.0.3",
+            "langs": "en",
+            "lastUpd": 1747738043.896285
+        },
+        "KissKH": {
+            "name": "KissKH",
+            "version": "0.1.6",
+            "langs": "all",
+            "lastUpd": 1746206220
+        }
+    },
+    "novel": {
+        "RoyalRoad": {
+            "name": "RoyalRoad",
+            "version": "0.0.1",
+            "langs": "en",
+            "lastUpd": 1779977117.297965
+        },
+        "NovelFire": {
+            "name": "NovelFire",
+            "version": "0.0.1",
+            "langs": "en",
+            "lastUpd": 1775284920.190297
+        },
+        "bookReadFree": {
+            "name": "bookReadFree",
+            "version": "0.0.1",
+            "langs": "en",
+            "lastUpd": 1773069753.928136
+        },
+        "Novelbuddy": {
+            "name": "Novelbuddy",
+            "version": "0.0.9",
+            "langs": "en",
+            "lastUpd": 1749491688.879926
+        }
+    }
+}
