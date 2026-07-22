@@ -91,6 +91,7 @@ async function scrapeAnimePage(browser: any, animeUrl: string, domain: string): 
                     const iframes = Array.from(document.querySelectorAll('iframe')) as HTMLIFrameElement[];
                     const player = iframes.find(i => i.src && (
                         i.src.includes('.php?id=') ||
+                        i.src.includes('.php?ep=') ||
                         i.src.includes('newplayer') ||
                         i.src.includes('embed') ||
                         i.src.includes('gogohd') ||
@@ -322,7 +323,8 @@ async function mineFromAniwave(query: string, episodeStr: string): Promise<boole
                     i.src.includes('stream') || 
                     i.src.includes('mega') ||
                     i.src.includes('drive') ||
-                    i.src.includes('php?id=')
+                    i.src.includes('php?id=') ||
+                    i.src.includes('php?ep=')
                 ));
                 return player ? player.src : null;
             });
@@ -521,7 +523,8 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
                             i.src.includes('stream') || 
                             i.src.includes('mega') ||
                             i.src.includes('drive') ||
-                            i.src.includes('php?id=')
+                            i.src.includes('php?id=') ||
+                            i.src.includes('php?ep=')
                         ));
                         return player ? player.src : null;
                     });

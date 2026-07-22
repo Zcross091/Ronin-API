@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import gogoanime from './routes/gogoanime';
 import manga from './routes/manga';
 import { GogoCDN } from './extractors';
+import { scrapeGogoanimeLight } from './scrapers/gogoanimeLight';
 
 dotenv.config();
 puppeteer.use(StealthPlugin());
@@ -41,49 +42,27 @@ fastify.get('/api/server1/:query/:episode', async (request, reply) => {
     const { query, episode } = request.params as { query: string, episode: string };
     const epNum = parseInt(episode);
     
-    for (const domain of GOGO_DOMAINS) {
-        try {
-            const searchUrl = `${domain}/search.html?keyword=${encodeURIComponent(query)}`;
-            const res = await axios.get(searchUrl, { timeout: 8000 });
-            const $ = cheerio.load(res.data);
-            
-            const firstResult = $('ul.items li p.name a').first();
-            if (!firstResult.length) continue;
-            
-            const seriesSlug = firstResult.attr('href')?.replace('/category/', '');
-            const episodeUrl = `${domain}/${seriesSlug}-episode-${epNum}`;
-            
-            const epRes = await axios.get(episodeUrl, { timeout: 8000 });
-            const ep$ = cheerio.load(epRes.data);
-            const iframe = ep$('.play-video iframe').attr('src');
-            
-            if (iframe) {
-                let videoUrl = iframe.startsWith('http') ? iframe : `https:${iframe}`;
-                await saveToSupabase(query, epNum, "http", videoUrl);
-                return { status: 200, server: "Server 1", query, episode: epNum, results: [{ title: `${query} - Ep ${epNum}`, url: videoUrl, source: "Server 1" }] };
-            }
-        } catch (e) {
-            console.log(`Server 1 failed on ${domain}`);
+    try {
+        const videoUrl = await scrapeGogoanimeLight(query, epNum, GOGO_DOMAINS);
+        
+        if (videoUrl) {
+            return { 
+                status: 200, 
+                server: "Server 1", 
+                query, 
+                episode: epNum, 
+                results: [{ title: `${query} - Ep ${epNum}`, url: videoUrl, source: "Server 1" }] 
+            };
+        } else {
+            reply.status(404).send({ detail: "Server 1: Extraction failed." });
         }
+    } catch (e: any) {
+        request.log.error(e);
+        reply.status(500).send({ detail: "Server 1: Internal Server Error." });
     }
-    reply.status(404).send({ detail: "Server 1: Extraction failed." });
 });
 
-fastify.get('/api/server2/:query/:episode', async (request, reply) => {
-    const { query, episode } = request.params as { query: string, episode: string };
-    const epNum = parseInt(episode);
-    const mockUrl = `https://mock-playwright-stream.com/embed/${query.replace(/ /g, '-').toLowerCase()}-ep-${epNum}`;
-    await saveToSupabase(query, epNum, "playwright", mockUrl);
-    return { status: 200, server: "Server 2", query, episode: epNum, results: [{ title: `${query} - Ep ${epNum}`, url: mockUrl, source: "Server 2" }] };
-});
 
-fastify.get('/api/server3/:query/:episode', async (request, reply) => {
-    const { query, episode } = request.params as { query: string, episode: string };
-    const epNum = parseInt(episode);
-    const mockUrl = `https://mock-playwright-stream.com/embed/${query.replace(/ /g, '-').toLowerCase()}-ep-${epNum}`;
-    await saveToSupabase(query, epNum, "playwright", mockUrl);
-    return { status: 200, server: "Server 3", query, episode: epNum, results: [{ title: `${query} - Ep ${epNum}`, url: mockUrl, source: "Server 3" }] };
-});
 
 fastify.get('/api/downloads/:query/:episode', async (request, reply) => {
     const { query, episode } = request.params as { query: string, episode: string };
