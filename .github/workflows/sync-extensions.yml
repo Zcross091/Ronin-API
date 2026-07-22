@@ -1,0 +1,49 @@
+name: Sync Extensions
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Run daily at midnight UTC
+  workflow_dispatch: # Allow manual triggering from the Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Ronin API Repository
+        uses: actions/checkout@v4
+        with:
+          path: ronin-api
+
+      - name: Sync mangayomi-extensions
+        run: |
+          git clone --depth 1 https://github.com/kodjodevf/mangayomi-extensions.git mangayomi
+          rm -rf ronin-api/extensions/mangayomi-extensions
+          mv mangayomi ronin-api/extensions/mangayomi-extensions
+          rm -rf ronin-api/extensions/mangayomi-extensions/.git
+
+      - name: Sync m2k3a-extensions
+        run: |
+          git clone --depth 1 https://github.com/m2k3a/m2k3a-extensions.git m2k3a
+          rm -rf ronin-api/extensions/m2k3a-extensions
+          mv m2k3a ronin-api/extensions/m2k3a-extensions
+          rm -rf ronin-api/extensions/m2k3a-extensions/.git
+
+      - name: Sync swak-extensions
+        run: |
+          git clone --depth 1 https://github.com/K3vinb5/swak-extensions.git swak
+          rm -rf ronin-api/extensions/swak-extensions
+          mv swak ronin-api/extensions/swak-extensions
+          rm -rf ronin-api/extensions/swak-extensions/.git
+
+      - name: Commit and Push Changes
+        working-directory: ronin-api
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add extensions/
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "chore: auto-sync latest community extensions"
+            git push
+          else
+            echo "No changes to commit."
+          fi
