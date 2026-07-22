@@ -11,6 +11,7 @@ import manga from './routes/manga';
 import miningRoutes from './routes/mining';
 import { GogoCDN } from './extractors';
 import { scrapeGogoanimeLight } from './scrapers/gogoanimeLight';
+import { waterfallMine } from './engine/waterfall';
 
 dotenv.config();
 puppeteer.use(StealthPlugin());
@@ -64,7 +65,58 @@ fastify.get('/api/server1/:query/:episode', async (request, reply) => {
     }
 });
 
+fastify.get('/api/stream/:query/:episode', async (request, reply) => {
+    const { query, episode } = request.params as { query: string, episode: string };
+    const epNum = parseInt(episode);
 
+    // ── Step 1: Check Supabase DB Cache ──
+    if (supabase) {
+        const cleanTitle = query.toLowerCase().trim();
+        const { data } = await supabase
+            .from('anime_links')
+            .select('title, url, type')
+            .eq('title', cleanTitle)
+            .eq('episode', epNum)
+            .limit(1);
+
+        if (data && data.length > 0) {
+            request.log.info(`⚡ [Stream] Cache hit for "${query}" Ep ${epNum}`);
+            return {
+                status: 200,
+                cached: true,
+                source: 'database',
+                query,
+                episode: epNum,
+                results: [{ title: `${query} - Ep ${epNum}`, url: data[0].url, source: 'Cached' }],
+            };
+        }
+    }
+
+    // ── Step 2: Run Waterfall Miner ──
+    request.log.info(`🔍 [Stream] Cache miss. Starting waterfall for "${query}" Ep ${epNum}...`);
+    const result = await waterfallMine(query, epNum, GOGO_DOMAINS);
+
+    if (result.found && result.url) {
+        // Auto-cache to Supabase for future instant delivery
+        await saveToSupabase(query, epNum, 'http', result.url);
+
+        return {
+            status: 200,
+            cached: false,
+            source: result.source,
+            query,
+            episode: epNum,
+            results: [{ title: `${query} - Ep ${epNum}`, url: result.url, source: result.source }],
+            triedSources: result.triedSources,
+        };
+    }
+
+    // ── Step 3: All sources failed ──
+    return reply.status(404).send({
+        detail: `No stream found for "${query}" Ep ${epNum} after trying ${result.triedSources.length} sources.`,
+        triedSources: result.triedSources,
+    });
+});
 
 fastify.get('/api/downloads/:query/:episode', async (request, reply) => {
     const { query, episode } = request.params as { query: string, episode: string };

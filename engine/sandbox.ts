@@ -32,6 +32,9 @@ class SharedPreferences {
         if (key === "alt_hoster_selection1") return ["player", "vidstreaming", "dood", "okru", "mp4upload"];
         return null;
     }
+    getString(key: string) { return this.get(key); }
+    getStringList(key: string) { return this.get(key) || []; }
+    getInt(key: string) { return 0; }
     set(key: string, value: string) {}
 }
 
