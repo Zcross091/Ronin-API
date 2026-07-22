@@ -29,11 +29,10 @@ async function mineSeries(query) {
 
         // 2. Get Episode List via AJAX
         const ajaxUrl = `https://hianime.to/ajax/v2/episode/list/${animeId}`;
-        const epListData = await page.evaluate(async (url) => {
-            const response = await fetch(url, {
+        const epListData = await page.evaluate((url) => {
+            return fetch(url, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
-            });
-            return await response.json();
+            }).then(res => res.json());
         }, ajaxUrl);
 
         // Use a temporary page to parse the HTML from JSON
