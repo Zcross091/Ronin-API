@@ -4,7 +4,7 @@ import { ExtensionRunner } from './sandbox';
 import { scrapeGogoanimeLight } from '../scrapers/gogoanimeLight';
 
 // Ordered list of extension script names to try (priority order)
-const EXTENSION_WATERFALL: string[] = [
+export const EXTENSION_WATERFALL: string[] = [
     'animeonsen',
     'sudatchi',
     'animegg',
@@ -137,9 +137,39 @@ async function tryExtension(
 export async function waterfallMine(
     query: string,
     episode: number,
-    gogoDomains: string[]
+    gogoDomains: string[],
+    forceSource?: string
 ): Promise<WaterfallResult> {
     const triedSources: WaterfallResult['triedSources'] = [];
+
+    // ── If forceSource is provided, only try that source ──
+    if (forceSource) {
+        if (forceSource.toLowerCase() === 'gogoanime') {
+            console.log(`🔍 [Waterfall] Forcing Gogoanime for "${query}" Ep ${episode}...`);
+            try {
+                const gogoUrl = await scrapeGogoanimeLight(query, episode, gogoDomains);
+                triedSources.push({ name: 'Gogoanime (native)', status: gogoUrl ? 'success' : 'fail' });
+                if (gogoUrl) {
+                    return { found: true, url: gogoUrl, source: 'Gogoanime', title: query, episode, triedSources };
+                }
+            } catch (e: any) {
+                triedSources.push({ name: 'Gogoanime (native)', status: 'fail', error: e.message });
+            }
+        } else {
+            console.log(`🔍 [Waterfall] Forcing extension "${forceSource}" for "${query}" Ep ${episode}...`);
+            const resultPromise = tryExtension(forceSource, query, episode);
+            const timeoutPromise = new Promise<{ url: null; error: string }>((resolve) =>
+                setTimeout(() => resolve({ url: null, error: `Timed out after ${PER_SOURCE_TIMEOUT_MS / 1000}s` }), PER_SOURCE_TIMEOUT_MS)
+            );
+            const result = await Promise.race([resultPromise, timeoutPromise]);
+            triedSources.push({ name: forceSource, status: result.url ? 'success' : 'fail', error: result.error });
+            if (result.url) {
+                return { found: true, url: result.url, source: forceSource, title: query, episode, triedSources };
+            }
+        }
+        
+        return { found: false, url: null, source: forceSource, title: query, episode, triedSources };
+    }
 
     // ── Priority 1: Native Gogoanime Scraper ──
     try {

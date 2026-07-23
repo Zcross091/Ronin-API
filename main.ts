@@ -11,7 +11,7 @@ import manga from './routes/manga';
 import miningRoutes from './routes/mining';
 import { GogoCDN } from './extractors';
 import { scrapeGogoanimeLight } from './scrapers/gogoanimeLight';
-import { waterfallMine } from './engine/waterfall';
+import { waterfallMine, EXTENSION_WATERFALL } from './engine/waterfall';
 
 dotenv.config();
 puppeteer.use(StealthPlugin());
@@ -65,12 +65,20 @@ fastify.get('/api/server1/:query/:episode', async (request, reply) => {
     }
 });
 
+fastify.get('/api/sources', async (request, reply) => {
+    return {
+        success: true,
+        sources: ['Gogoanime', ...EXTENSION_WATERFALL]
+    };
+});
+
 fastify.get('/api/stream/:query/:episode', async (request, reply) => {
     const { query, episode } = request.params as { query: string, episode: string };
     const epNum = parseInt(episode);
+    const { source } = request.query as { source?: string };
 
-    // ── Step 1: Check Supabase DB Cache ──
-    if (supabase) {
+    // ── Step 1: Check Supabase DB Cache (Only if no specific source requested) ──
+    if (supabase && !source) {
         const cleanTitle = query.toLowerCase().trim();
         const { data } = await supabase
             .from('anime_links')
@@ -93,8 +101,13 @@ fastify.get('/api/stream/:query/:episode', async (request, reply) => {
     }
 
     // ── Step 2: Run Waterfall Miner ──
-    request.log.info(`🔍 [Stream] Cache miss. Starting waterfall for "${query}" Ep ${epNum}...`);
-    const result = await waterfallMine(query, epNum, GOGO_DOMAINS);
+    if (source) {
+        request.log.info(`🔍 [Stream] Forcing source "${source}" for "${query}" Ep ${epNum}...`);
+    } else {
+        request.log.info(`🔍 [Stream] Cache miss. Starting waterfall for "${query}" Ep ${epNum}...`);
+    }
+    
+    const result = await waterfallMine(query, epNum, GOGO_DOMAINS, source);
 
     if (result.found && result.url) {
         // Auto-cache to Supabase for future instant delivery
