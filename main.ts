@@ -100,6 +100,16 @@ fastify.get('/api/stream/:query/:episode', async (request, reply) => {
         }
     }
 
+    // ── Step 2: Skip Live Waterfall Miner on Vercel to avoid timeouts ──
+    if (process.env.VERCEL) {
+        request.log.info(`⚡ [Stream] Cache miss on Vercel. Skipping live mining to avoid timeout.`);
+        return reply.status(404).send({
+            detail: `Stream not cached for "${query}" Ep ${epNum}.`,
+            requiresMining: true,
+            triedSources: []
+        });
+    }
+
     // ── Step 2: Run Waterfall Miner ──
     if (source) {
         request.log.info(`🔍 [Stream] Forcing source "${source}" for "${query}" Ep ${epNum}...`);
