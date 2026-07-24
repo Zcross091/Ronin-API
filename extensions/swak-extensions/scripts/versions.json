@@ -1,5 +1,11 @@
 {
     "manga": {
+        "Mangafire": {
+            "name": "Mangafire",
+            "version": "1.0.3",
+            "langs": "all",
+            "lastUpd": 1784217717.843734
+        },
         "Atsumaru": {
             "name": "Atsumaru",
             "version": "0.0.1",
@@ -12,15 +18,15 @@
             "langs": "ja",
             "lastUpd": 1761760611.599596
         },
-        "Mangapark": {
-            "name": "Mangapark",
-            "version": "1.0.1",
-            "langs": "en",
-            "lastUpd": 1758079504.835998
-        },
         "Mangapill": {
             "name": "Mangapill",
             "version": "1.0.4",
+            "langs": "en",
+            "lastUpd": 1758079504.835998
+        },
+        "Mangapark": {
+            "name": "Mangapark",
+            "version": "1.0.1",
             "langs": "en",
             "lastUpd": 1758079504.835998
         },
@@ -62,16 +68,16 @@
             "langs": "all",
             "lastUpd": 1778481909.284884
         },
-        "Sudatchi": {
-            "name": "Sudatchi",
-            "version": "2.0.1",
-            "langs": "en",
-            "lastUpd": 1776836230.987179
-        },
         "Animeonsen": {
             "name": "Animeonsen",
             "version": "1.0.5",
             "langs": "en, ja",
+            "lastUpd": 1776836230.987179
+        },
+        "Sudatchi": {
+            "name": "Sudatchi",
+            "version": "2.0.1",
+            "langs": "en",
             "lastUpd": 1776836230.987179
         },
         "Moviesda": {
