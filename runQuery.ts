@@ -478,18 +478,7 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
 
             console.log(`📂 Total Episodes found: ${episodesToMine.length}`);
 
-            // Deep-Dive Mode: Prioritize target episode first, but mine ALL remaining episodes in the series!
-            if (episodeStr && episodesToMine.length > 0) {
-                const targetEp = parseInt(episodeStr);
-                episodesToMine.sort((a: any, b: any) => {
-                    const numA = parseInt(a.num || '0');
-                    const numB = parseInt(b.num || '0');
-                    if (numA === targetEp) return -1;
-                    if (numB === targetEp) return 1;
-                    return numA - numB;
-                });
-                console.log(`⚡ Deep-Dive Series Mining: Prioritizing requested Episode ${targetEp}, then mining all ${episodesToMine.length} episodes of "${query}"...`);
-            }
+            console.log(`⚡ Deep-Dive Series Mining: Mining all ${episodesToMine.length} episodes of "${query}" in natural source order...`);
 
             // 3. Loop through episodes and extract direct links & iframe links
             for (const ep of episodesToMine) {

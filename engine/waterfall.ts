@@ -262,17 +262,7 @@ export async function mineExtensionAllEpisodes(
         const detail = await runner.getDetail(detailUrl);
         if (!detail || !detail.episodes || detail.episodes.length === 0) return { minedCount: 0 };
 
-        const episodes = detail.episodes;
-        // Prioritize target ep first
-        episodes.sort((a: any, b: any) => {
-            const numA = parseInt((a.name || '').replace(/[^0-9]/g, '')) || 0;
-            const numB = parseInt((b.name || '').replace(/[^0-9]/g, '')) || 0;
-            if (numA === targetEpNum) return -1;
-            if (numB === targetEpNum) return 1;
-            return numA - numB;
-        });
-
-        console.log(`⚡ Deep Dive Mode (${extensionName}): Found ${episodes.length} episodes for "${query}". Mining all...`);
+        console.log(`⚡ Deep Dive Mode (${extensionName}): Found ${episodes.length} episodes for "${query}". Mining all in natural source order...`);
 
         for (const ep of episodes) {
             const epUrl = ep.url || ep.link;
