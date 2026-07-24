@@ -23,17 +23,21 @@ jobs:
 
       - name: Sync m2k3a-extensions
         run: |
-          git clone --depth 1 https://github.com/m2k3a/m2k3a-extensions.git m2k3a
-          rm -rf ronin-api/extensions/m2k3a-extensions
-          mv m2k3a ronin-api/extensions/m2k3a-extensions
-          rm -rf ronin-api/extensions/m2k3a-extensions/.git
+          git clone --depth 1 https://github.com/m2k3a/mangayomi-extensions.git m2k3a || true
+          if [ -d "m2k3a" ]; then
+            rm -rf ronin-api/extensions/m2k3a-extensions
+            mv m2k3a ronin-api/extensions/m2k3a-extensions
+            rm -rf ronin-api/extensions/m2k3a-extensions/.git
+          fi
 
       - name: Sync swak-extensions
         run: |
-          git clone --depth 1 https://github.com/K3vinb5/swak-extensions.git swak
-          rm -rf ronin-api/extensions/swak-extensions
-          mv swak ronin-api/extensions/swak-extensions
-          rm -rf ronin-api/extensions/swak-extensions/.git
+          git clone --depth 1 https://github.com/Swakshan/swak-extensions.git swak || true
+          if [ -d "swak" ]; then
+            rm -rf ronin-api/extensions/swak-extensions
+            mv swak ronin-api/extensions/swak-extensions
+            rm -rf ronin-api/extensions/swak-extensions/.git
+          fi
 
       - name: Commit and Push Changes
         working-directory: ronin-api
