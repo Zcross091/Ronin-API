@@ -4,6 +4,7 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { waterfallMine } from './engine/waterfall';
 
 dotenv.config();
 puppeteer.use(StealthPlugin());
@@ -36,9 +37,10 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const query = process.argv[2];
 const serverStr = process.argv[3] || '1';
 const episodeStr = process.argv[4] || '';
+const forceSource = process.argv[5] || '';
 
 if (!query) {
-    console.error('❌ Usage: ts-node runQuery.ts "anime title" [server] [episode]');
+    console.error('❌ Usage: ts-node runQuery.ts "anime title" [server] [episode] [forceSource]');
     process.exit(1);
 }
 
@@ -569,7 +571,29 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
 }
 
 (async () => {
-    console.log(`\n🚀 Ronin API One-Shot Query: "${query}" Server: ${serverStr} Ep: ${episodeStr}\n`);
+    console.log(`\n🚀 Ronin API One-Shot Query: "${query}" Server: ${serverStr} Ep: ${episodeStr} ForceSource: ${forceSource}\n`);
+
+    if (forceSource) {
+        console.log(`\n⏳ Forcing extraction from source "${forceSource}" for Ep ${episodeStr}...`);
+        const epNum = parseInt(episodeStr) || 1;
+        try {
+            const result = await waterfallMine(query, epNum, GOGO_DOMAINS, forceSource);
+            if (result.found && result.url) {
+                console.log(`🎉 Found link on forced source "${forceSource}": ${result.url}`);
+                const type = result.url.startsWith('magnet:') ? 'torrent' : 'http';
+                // Wait! Since Gogoanime usually ends with " dub" in DB cache title, let's keep it simple or format it
+                await saveToSupabase(query, epNum, type, result.url);
+                console.log(`\n✅ Mining completed successfully for: "${query}" (forced source)`);
+                process.exit(0);
+            } else {
+                console.error(`❌ Forced source "${forceSource}" failed to find stream for: "${query}" Ep ${epNum}`);
+                process.exit(1);
+            }
+        } catch (err: any) {
+            console.error(`❌ Forced source mining crashed:`, err.message);
+            process.exit(1);
+        }
+    }
 
     if (serverStr === '2') {
         const success = await mineFromAniwave(query, episodeStr);

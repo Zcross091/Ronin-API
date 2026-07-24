@@ -29,8 +29,10 @@ jobs:
       - name: Run miner
         run: |
           QUERY="${{ github.event.client_payload.query || github.event.inputs.query }}"
-          echo "Mining for: $QUERY"
-          ts-node runQuery.ts "$QUERY"
+          EPISODE="${{ github.event.client_payload.episode || '1' }}"
+          SOURCE="${{ github.event.client_payload.source || '' }}"
+          echo "Mining for: $QUERY (Episode: $EPISODE, Source: $SOURCE)"
+          ts-node runQuery.ts "$QUERY" "1" "$EPISODE" "$SOURCE"
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

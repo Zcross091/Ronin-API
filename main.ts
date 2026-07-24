@@ -210,7 +210,7 @@ fastify.get('/api/db', async (request, reply) => {
 });
 
 fastify.get('/api/trigger-miner', async (request, reply) => {
-    const { title, episode } = request.query as { title?: string, episode?: string };
+    const { title, episode, source } = request.query as { title?: string, episode?: string, source?: string };
     if (!title) {
         return reply.status(400).send({ error: "Missing title parameter" });
     }
@@ -227,11 +227,14 @@ fastify.get('/api/trigger-miner', async (request, reply) => {
                 'Accept': 'application/vnd.github.v3+json',
                 'Authorization': `token ${GITHUB_PAT}`,
                 'Content-Type': 'application/json',
+                'User-Agent': 'Ronin-API-Proxy'
             },
             body: JSON.stringify({
                 event_type: 'search-or-mine',
                 client_payload: {
-                    query: title
+                    query: title,
+                    episode: episode || '1',
+                    source: source || ''
                 }
             })
         });
