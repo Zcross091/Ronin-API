@@ -33,6 +33,15 @@ jobs:
             rm -rf ronin-api/extensions/m2k3a-extensions/.git
           fi
 
+      - name: Sync swak-extensions
+        run: |
+          git clone --depth 1 https://github.com/Swakshan/mangayomi-swak-extensions.git swak || true
+          if [ -d "swak" ]; then
+            rm -rf ronin-api/extensions/swak-extensions
+            mv swak ronin-api/extensions/swak-extensions
+            rm -rf ronin-api/extensions/swak-extensions/.git
+          fi
+
       - name: Commit and Push Changes
         working-directory: ronin-api
         run: |
