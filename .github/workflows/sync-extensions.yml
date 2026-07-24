@@ -5,6 +5,9 @@ on:
     - cron: '0 0 * * *' # Run daily at midnight UTC
   workflow_dispatch: # Allow manual triggering from the Actions tab
 
+permissions:
+  contents: write
+
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -28,15 +31,6 @@ jobs:
             rm -rf ronin-api/extensions/m2k3a-extensions
             mv m2k3a ronin-api/extensions/m2k3a-extensions
             rm -rf ronin-api/extensions/m2k3a-extensions/.git
-          fi
-
-      - name: Sync swak-extensions
-        run: |
-          git clone --depth 1 https://github.com/Swakshan/swak-extensions.git swak || true
-          if [ -d "swak" ]; then
-            rm -rf ronin-api/extensions/swak-extensions
-            mv swak ronin-api/extensions/swak-extensions
-            rm -rf ronin-api/extensions/swak-extensions/.git
           fi
 
       - name: Commit and Push Changes
