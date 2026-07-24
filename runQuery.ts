@@ -4,7 +4,7 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import { waterfallMine } from './engine/waterfall';
+import { waterfallMine, mineExtensionAllEpisodes } from './engine/waterfall';
 
 dotenv.config();
 puppeteer.use(StealthPlugin());
@@ -478,15 +478,17 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
 
             console.log(`📂 Total Episodes found: ${episodesToMine.length}`);
 
+            // Deep-Dive Mode: Prioritize target episode first, but mine ALL remaining episodes in the series!
             if (episodeStr && episodesToMine.length > 0) {
                 const targetEp = parseInt(episodeStr);
-                // Filter only if we have a full list from AJAX
-                if (episodesToMine.length > 1) {
-                    episodesToMine = episodesToMine.filter(ep => parseInt(ep.num || '') === targetEp);
-                }
-                if (episodesToMine.length === 0) {
-                    console.log(`⚠️ Requested episode ${episodeStr} not found in episode list.`);
-                }
+                episodesToMine.sort((a: any, b: any) => {
+                    const numA = parseInt(a.num || '0');
+                    const numB = parseInt(b.num || '0');
+                    if (numA === targetEp) return -1;
+                    if (numB === targetEp) return 1;
+                    return numA - numB;
+                });
+                console.log(`⚡ Deep-Dive Series Mining: Prioritizing requested Episode ${targetEp}, then mining all ${episodesToMine.length} episodes of "${query}"...`);
             }
 
             // 3. Loop through episodes and extract direct links & iframe links
@@ -574,20 +576,28 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
     console.log(`\n🚀 Ronin API One-Shot Query: "${query}" Server: ${serverStr} Ep: ${episodeStr} ForceSource: ${forceSource}\n`);
 
     if (forceSource) {
-        console.log(`\n⏳ Forcing extraction from source "${forceSource}" for Ep ${episodeStr}...`);
-        const epNum = parseInt(episodeStr) || 1;
+        console.log(`\n⏳ Forcing Deep-Dive extraction from source "${forceSource}" for "${query}" (Requested Ep: ${episodeStr || '1'})...`);
+        const targetEpNum = parseInt(episodeStr) || 1;
         try {
-            const result = await waterfallMine(query, epNum, GOGO_DOMAINS, forceSource);
-            if (result.found && result.url) {
-                console.log(`🎉 Found link on forced source "${forceSource}": ${result.url}`);
-                const type = result.url.startsWith('magnet:') ? 'torrent' : 'http';
-                // Wait! Since Gogoanime usually ends with " dub" in DB cache title, let's keep it simple or format it
-                await saveToSupabase(query, epNum, type, result.url);
-                console.log(`\n✅ Mining completed successfully for: "${query}" (forced source)`);
-                process.exit(0);
+            if (forceSource.toLowerCase() === 'gogoanime') {
+                console.log(`\n⏳ Mining all episodes from GogoAnime...`);
+                const gogoSuccess = await mineFromGogo(query);
+                if (gogoSuccess) {
+                    console.log(`\n✅ Deep-Dive GogoAnime mining completed for: "${query}"`);
+                    process.exit(0);
+                } else {
+                    console.error(`❌ Forced source "Gogoanime" failed to find streams for: "${query}"`);
+                    process.exit(1);
+                }
             } else {
-                console.error(`❌ Forced source "${forceSource}" failed to find stream for: "${query}" Ep ${epNum}`);
-                process.exit(1);
+                const { minedCount } = await mineExtensionAllEpisodes(forceSource, query, targetEpNum, saveToSupabase);
+                if (minedCount > 0) {
+                    console.log(`\n✅ Deep-Dive extension mining completed successfully for: "${query}" (${minedCount} episodes saved via "${forceSource}")`);
+                    process.exit(0);
+                } else {
+                    console.error(`❌ Forced extension source "${forceSource}" failed to find streams for: "${query}"`);
+                    process.exit(1);
+                }
             }
         } catch (err: any) {
             console.error(`❌ Forced source mining crashed:`, err.message);

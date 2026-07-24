@@ -234,3 +234,70 @@ export async function waterfallMine(
         triedSources,
     };
 }
+
+/**
+ * Deep Dive Mode: Attempt to run a single extension for ALL episodes of a series
+ */
+export async function mineExtensionAllEpisodes(
+    extensionName: string,
+    query: string,
+    targetEpNum: number = 1,
+    saveCallback: (title: string, episode: number, type: string, url: string) => Promise<void>
+): Promise<{ minedCount: number }> {
+    const scriptPath = await findExtensionPath(extensionName);
+    if (!scriptPath) return { minedCount: 0 };
+
+    let minedCount = 0;
+    try {
+        const runner = new ExtensionRunner(scriptPath);
+        await runner.load();
+
+        const searchResults = await runner.search(query, 1);
+        if (!searchResults?.list || searchResults.list.length === 0) return { minedCount: 0 };
+
+        const firstResult = searchResults.list[0];
+        const detailUrl = firstResult.link || firstResult.url;
+        if (!detailUrl) return { minedCount: 0 };
+
+        const detail = await runner.getDetail(detailUrl);
+        if (!detail || !detail.episodes || detail.episodes.length === 0) return { minedCount: 0 };
+
+        const episodes = detail.episodes;
+        // Prioritize target ep first
+        episodes.sort((a: any, b: any) => {
+            const numA = parseInt((a.name || '').replace(/[^0-9]/g, '')) || 0;
+            const numB = parseInt((b.name || '').replace(/[^0-9]/g, '')) || 0;
+            if (numA === targetEpNum) return -1;
+            if (numB === targetEpNum) return 1;
+            return numA - numB;
+        });
+
+        console.log(`⚡ Deep Dive Mode (${extensionName}): Found ${episodes.length} episodes for "${query}". Mining all...`);
+
+        for (const ep of episodes) {
+            const epUrl = ep.url || ep.link;
+            const epName = ep.name || '';
+            const epNum = parseInt(epName.replace(/[^0-9]/g, '')) || 1;
+            if (!epUrl) continue;
+
+            try {
+                const videos = await runner.getVideoList(epUrl);
+                const videoList = Array.isArray(videos) ? videos : (videos?.list || [videos]);
+                for (const v of videoList) {
+                    const videoUrl = v.url || v.link || v.videoUrl;
+                    if (videoUrl && videoUrl.startsWith('http')) {
+                        await saveCallback(query, epNum, 'http', videoUrl);
+                        minedCount++;
+                        break;
+                    }
+                }
+            } catch (e) {
+                // skip episode error
+            }
+        }
+    } catch (e: any) {
+        console.error(`❌ Error in mineExtensionAllEpisodes for ${extensionName}:`, e.message);
+    }
+    return { minedCount };
+}
+
