@@ -114,6 +114,16 @@ export class ExtensionRunner {
         return await this.instance.search(query, page, []);
     }
 
+    async getPopular(page: number = 1) {
+        if (!this.instance.getPopular) throw new Error("Extension does not support getPopular");
+        return await this.instance.getPopular(page);
+    }
+
+    async getLatestUpdates(page: number = 1) {
+        if (!this.instance.getLatestUpdates) throw new Error("Extension does not support getLatestUpdates");
+        return await this.instance.getLatestUpdates(page);
+    }
+
     async getDetail(url: string) {
         if (!this.instance.getDetail) throw new Error("Extension does not support getDetail");
         return await this.instance.getDetail(url);

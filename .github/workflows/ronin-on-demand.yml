@@ -6,8 +6,7 @@ on:
     inputs:
       query:
         description: 'Anime title to mine'
-        required: true
-        default: 'Naruto'
+        required: false
 jobs:
   mine:
     runs-on: ubuntu-latest
@@ -29,10 +28,16 @@ jobs:
       - name: Run miner
         run: |
           QUERY="${{ github.event.client_payload.query || github.event.inputs.query }}"
-          EPISODE="${{ github.event.client_payload.episode || '1' }}"
+          EPISODE="${{ github.event.client_payload.episode || '' }}"
           SOURCE="${{ github.event.client_payload.source || '' }}"
-          echo "Mining for: $QUERY (Episode: $EPISODE, Source: $SOURCE)"
-          ts-node runQuery.ts "$QUERY" "1" "$EPISODE" "$SOURCE"
+          
+          if [ -z "$QUERY" ]; then
+            echo "No query provided. Starting Crawler Mode..."
+            ts-node crawler.ts
+          else
+            echo "Mining for: $QUERY (Episode: $EPISODE, Source: $SOURCE)"
+            ts-node runQuery.ts "$QUERY" "1" "$EPISODE" "$SOURCE"
+          fi
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
