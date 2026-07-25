@@ -262,6 +262,7 @@ export async function mineExtensionAllEpisodes(
         const detail = await runner.getDetail(detailUrl);
         if (!detail || !detail.episodes || detail.episodes.length === 0) return { minedCount: 0 };
 
+        const episodes = detail.episodes;
         console.log(`⚡ Deep Dive Mode (${extensionName}): Found ${episodes.length} episodes for "${query}". Mining all in natural source order...`);
 
         for (const ep of episodes) {

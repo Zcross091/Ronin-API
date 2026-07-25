@@ -26,10 +26,20 @@ export async function scrapeGogoanimeLight(query: string, epNum: number, domains
             const res = await axios.get(searchUrl, { timeout: 8000 });
             const $ = cheerio.load(res.data);
             
-            const firstResult = $('ul.items li p.name a').first();
-            if (!firstResult.length) continue;
+            const cleanQuery = query.toLowerCase().trim();
+            const querySlug = cleanQuery.replace(/[^a-z0-9]+/g, '-');
             
-            const seriesSlug = firstResult.attr('href')?.replace('/category/', '');
+            let chosenResult = $('ul.items li p.name a').first();
+            $('ul.items li p.name a').each((_, el) => {
+                const text = $(el).text().toLowerCase().trim();
+                const href = $(el).attr('href') || '';
+                if (text === cleanQuery || href.endsWith(`/category/${querySlug}`)) {
+                    chosenResult = $(el);
+                }
+            });
+
+            if (!chosenResult.length) continue;
+            const seriesSlug = chosenResult.attr('href')?.replace('/category/', '');
             const episodeUrl = `${domain}/${seriesSlug}-episode-${epNum}`;
             
             const epRes = await axios.get(episodeUrl, { timeout: 8000 });

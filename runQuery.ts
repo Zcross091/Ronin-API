@@ -383,19 +383,31 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
                         
                         const linksToSearch = primaryLinks.length > 0 ? primaryLinks : allLinks;
                         
-                        const querySlug = q.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-                        const target = linksToSearch.find(l => {
+                        const cleanQuery = q.toLowerCase().trim();
+                        const querySlug = cleanQuery.replace(/[^a-z0-9]+/g, '-');
+                        const queryNoSpace = cleanQuery.replace(/[^a-z0-9]/g, '');
+
+                        // 1. Try exact title or exact slug match
+                        let target = linksToSearch.find(l => {
                             if (!l.href) return false;
                             const h = l.href.toLowerCase();
+                            const text = (l.innerText || l.textContent || '').toLowerCase().trim();
                             const cleanHref = h.split('?')[0].split('#')[0];
                             const currentClean = window.location.href.toLowerCase().split('?')[0].split('#')[0];
                             
-                            return h.includes(querySlug) && 
-                                   !h.includes('/search') &&
-                                   !h.includes('?s=') &&
-                                   !h.includes('?keyword=') &&
-                                   cleanHref !== currentClean;
+                            const isMatch = text === cleanQuery || h.includes(`/watch/${querySlug}-`) || h.includes(`/${querySlug}`);
+                            return isMatch && !h.includes('/search') && !h.includes('?keyword=') && cleanHref !== currentClean;
                         });
+
+                        // 2. Fallback to containing full slug
+                        if (!target) {
+                            target = linksToSearch.find(l => {
+                                if (!l.href) return false;
+                                const h = l.href.toLowerCase();
+                                return (h.includes(querySlug) || h.replace(/[^a-z0-9]/g, '').includes(queryNoSpace)) && !h.includes('/search') && !h.includes('?keyword=');
+                            });
+                        }
+
                         return target ? target.href : null;
                     }, query);
                     if (animeLink) break;
