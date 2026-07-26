@@ -654,6 +654,18 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
             mineFromAniwave(query, episodeStr)
         ]);
 
+        // ── Step 5: Mine Dub version if query is not already a Dub request ──
+        if (!query.toLowerCase().endsWith(' dub')) {
+            console.log(`\n🎙️ Step 5: Checking and mining Dub version for "${query}"...`);
+            try {
+                const targetEp = parseInt(episodeStr) || 1;
+                await mineFromGogo(`${query} dub`);
+                await mineExtensionAllEpisodes('allanime', `${query} dub`, targetEp, saveToSupabase);
+            } catch (dubErr: any) {
+                console.log(`ℹ️ Dub mining notice: ${dubErr.message}`);
+            }
+        }
+
         if (!hianimeDirectSuccess && !gogoSuccess && !extensionSuccess && !nyaaSuccess && !aniwaveSuccess) {
             console.error(`❌ All sources failed for: "${query}"`);
             process.exit(1);

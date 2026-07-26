@@ -1,12 +1,30 @@
 import { ExtensionRunner } from './engine/sandbox';
-import { spawnSync } from 'child_process';
+import { mineExtensionAllEpisodes } from './engine/waterfall';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 import path from 'path';
+
+dotenv.config();
+
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseKey = process.env.SUPABASE_KEY || "";
+const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+
+async function saveToSupabase(title: string, episode: number, type: string, url: string) {
+    if (!supabase) return;
+    const { error } = await supabase.from('anime_links').upsert(
+        { title: title.toLowerCase().trim(), episode, type, url },
+        { onConflict: 'title, episode, type' }
+    );
+    if (error) console.error("❌ Supabase Error:", error);
+    else console.log(`✅ Cached: [${title}] Ep ${episode} -> ${url}`);
+}
 
 const EXTENSION_PATH = path.join(__dirname, 'extensions/m2k3a-extensions/javascript/anime/src/en/allanime.js');
 
 async function runCrawler() {
-    console.log(`\n🕸️ Starting Ronin Auto-Crawler 🕸️`);
-    console.log(`Using extension: ${EXTENSION_PATH}`);
+    console.log(`\n🕸️ Starting Ronin Fast Auto-Crawler 🕸️`);
+    console.log(`Using primary extension: ${EXTENSION_PATH}`);
     
     let runner: ExtensionRunner;
     try {
@@ -17,10 +35,10 @@ async function runCrawler() {
         process.exit(1);
     }
 
-    const maxPages = 10;
+    const maxPages = 5;
     
-    // 1. Crawl Popular
-    console.log(`\n🔥 Phase 1: Crawling Popular Anime`);
+    // 1. Crawl Popular Anime (Sub & Dub)
+    console.log(`\n🔥 Phase 1: Crawling Popular Anime (Sub & Dub)`);
     for (let page = 1; page <= maxPages; page++) {
         console.log(`\n📄 Fetching Popular Page ${page}...`);
         try {
@@ -35,25 +53,22 @@ async function runCrawler() {
 
             for (const anime of animes) {
                 const title = anime.name;
+                if (!title) continue;
+
                 console.log(`\n=================================================`);
-                console.log(`💎 [CRAWLER] Mined Target: ${title}`);
+                console.log(`💎 [CRAWLER] Fast Mining: "${title}"`);
                 console.log(`=================================================`);
                 
-                // Spawn runQuery.ts to mine all episodes for this title
-                const res = spawnSync('npx', ['ts-node', 'runQuery.ts', title, '1', ''], {
-                    stdio: 'inherit',
-                    cwd: __dirname
-                });
+                // Mine SUB version via lightweight extension
+                const { minedCount: subCount } = await mineExtensionAllEpisodes('allanime', title, 1, saveToSupabase);
                 
-                if (res.status !== 0) {
-                    console.log(`⚠️ Miner exited with error code for "${title}". Continuing...`);
-                }
+                // Mine DUB version via lightweight extension
+                const { minedCount: dubCount } = await mineExtensionAllEpisodes('allanime', `${title} dub`, 1, saveToSupabase);
+                
+                console.log(`📊 Total mined for "${title}": ${subCount} Sub episodes, ${dubCount} Dub episodes.`);
             }
             
-            if (!result.hasNextPage) {
-                console.log(`No more popular pages.`);
-                break;
-            }
+            if (!result.hasNextPage) break;
         } catch (e: any) {
             console.error(`❌ Error crawling popular page ${page}:`, e.message);
             break;
@@ -61,7 +76,7 @@ async function runCrawler() {
     }
 
     // 2. Crawl Latest Updates
-    console.log(`\n✨ Phase 2: Crawling Latest Updates`);
+    console.log(`\n✨ Phase 2: Crawling Latest Updates (Sub & Dub)`);
     for (let page = 1; page <= maxPages; page++) {
         console.log(`\n📄 Fetching Latest Updates Page ${page}...`);
         try {
@@ -69,38 +84,28 @@ async function runCrawler() {
             const result = typeof resultStr === 'string' ? JSON.parse(resultStr) : resultStr;
             const animes = result.list || [];
             
-            if (animes.length === 0) {
-                console.log(`No more latest anime found.`);
-                break;
-            }
+            if (animes.length === 0) break;
 
             for (const anime of animes) {
                 const title = anime.name;
+                if (!title) continue;
+
                 console.log(`\n=================================================`);
-                console.log(`💎 [CRAWLER] Mined Target: ${title}`);
+                console.log(`💎 [CRAWLER] Fast Mining Latest: "${title}"`);
                 console.log(`=================================================`);
                 
-                const res = spawnSync('npx', ['ts-node', 'runQuery.ts', title, '1', ''], {
-                    stdio: 'inherit',
-                    cwd: __dirname
-                });
-                
-                if (res.status !== 0) {
-                    console.log(`⚠️ Miner exited with error code for "${title}". Continuing...`);
-                }
+                await mineExtensionAllEpisodes('allanime', title, 1, saveToSupabase);
+                await mineExtensionAllEpisodes('allanime', `${title} dub`, 1, saveToSupabase);
             }
             
-            if (!result.hasNextPage) {
-                console.log(`No more latest pages.`);
-                break;
-            }
+            if (!result.hasNextPage) break;
         } catch (e: any) {
             console.error(`❌ Error crawling latest page ${page}:`, e.message);
             break;
         }
     }
     
-    console.log(`\n🎉 Crawl finished successfully!`);
+    console.log(`\n🎉 Ronin Fast Auto-Crawl finished successfully!`);
 }
 
 runCrawler().catch(console.error);
