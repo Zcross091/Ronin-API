@@ -627,17 +627,34 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
         if (!hianimeDirectSuccess) {
             console.log(`\n⚠️ HiAnime Direct failed or returned no episodes. Falling back to GogoAnime...`);
             gogoSuccess = await mineFromGogo(query);
-        } else {
-            console.log(`\n🎉 HiAnime Direct successfully mined episodes. Skipping GogoAnime fallback.`);
         }
 
-        console.log(`\n⏳ Step 2: Mining Nyaa & Aniwave (As alternatives)...`);
+        let extensionSuccess = false;
+        if (!hianimeDirectSuccess && !gogoSuccess) {
+            console.log(`\n⏳ Step 3: Running Extension Waterfall (Lightweight JS Engines)...`);
+            const targetEp = parseInt(episodeStr) || 1;
+            for (const extName of ['allanime', 'animegg', 'kisskh', 'sudatchi', 'animeonsen', 'animetsu', 'autoembed']) {
+                console.log(`🔍 [Waterfall Fallback] Trying extension "${extName}" for "${query}"...`);
+                try {
+                    const { minedCount } = await mineExtensionAllEpisodes(extName, query, targetEp, saveToSupabase);
+                    if (minedCount > 0) {
+                        console.log(`🎉 Extension "${extName}" successfully mined ${minedCount} episodes!`);
+                        extensionSuccess = true;
+                        break;
+                    }
+                } catch (e: any) {
+                    console.log(`❌ Extension "${extName}" failed: ${e.message}`);
+                }
+            }
+        }
+
+        console.log(`\n⏳ Step 4: Mining Nyaa & Aniwave (As alternatives)...`);
         const [nyaaSuccess, aniwaveSuccess] = await Promise.all([
             mineFromNyaa(query),
             mineFromAniwave(query, episodeStr)
         ]);
 
-        if (!hianimeDirectSuccess && !gogoSuccess && !nyaaSuccess && !aniwaveSuccess) {
+        if (!hianimeDirectSuccess && !gogoSuccess && !extensionSuccess && !nyaaSuccess && !aniwaveSuccess) {
             console.error(`❌ All sources failed for: "${query}"`);
             process.exit(1);
         }
