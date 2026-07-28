@@ -265,10 +265,19 @@ export async function mineExtensionAllEpisodes(
         const episodes = detail.episodes;
         console.log(`⚡ Deep Dive Mode (${extensionName}): Found ${episodes.length} episodes for "${query}". Mining all in natural source order...`);
 
-        for (const ep of episodes) {
+        for (let i = 0; i < episodes.length; i++) {
+            const ep = episodes[i];
             const epUrl = ep.url || ep.link;
-            const epName = ep.name || '';
-            const epNum = parseInt(epName.replace(/[^0-9]/g, '')) || 1;
+            const epName = ep.name || ep.title || '';
+            
+            let epNum = i + 1;
+            const match = epName.match(/(?:ep|episode|#)?\s*(\d+)/i);
+            if (match) {
+                const parsed = parseInt(match[1]);
+                if (!isNaN(parsed) && parsed > 0 && parsed <= episodes.length + 100) {
+                    epNum = parsed;
+                }
+            }
             if (!epUrl) continue;
 
             try {
