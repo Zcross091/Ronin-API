@@ -263,22 +263,55 @@ export async function mineExtensionAllEpisodes(
         if (!detail || !detail.episodes || detail.episodes.length === 0) return { minedCount: 0 };
 
         const episodes = detail.episodes;
-        console.log(`⚡ Deep Dive Mode (${extensionName}): Found ${episodes.length} episodes for "${query}". Mining all in natural source order...`);
+
+        // ── Detect Array Ordering (Ascending vs Descending) ──
+        let isDescending = false;
+        if (episodes.length > 1) {
+            const firstEpName = String(episodes[0].name || episodes[0].title || '');
+            const lastEpName = String(episodes[episodes.length - 1].name || episodes[episodes.length - 1].title || '');
+            const firstMatch = firstEpName.match(/\b(\d+)\b/);
+            const lastMatch = lastEpName.match(/\b(\d+)\b/);
+            if (firstMatch && lastMatch) {
+                const firstVal = parseInt(firstMatch[1]);
+                const lastVal = parseInt(lastMatch[1]);
+                if (firstVal > lastVal) {
+                    isDescending = true;
+                }
+            }
+        }
+
+        console.log(`⚡ Deep Dive Mode (${extensionName}): Found ${episodes.length} episodes for "${query}". Order detected: ${isDescending ? 'Descending (Newest First)' : 'Ascending (Oldest First)'}.`);
 
         for (let i = 0; i < episodes.length; i++) {
             const ep = episodes[i];
-            const epUrl = ep.url || ep.link;
-            const epName = ep.name || ep.title || '';
-            
-            let epNum = i + 1;
-            const match = epName.match(/(?:ep|episode|#)?\s*(\d+)/i);
-            if (match) {
-                const parsed = parseInt(match[1]);
-                if (!isNaN(parsed) && parsed > 0 && parsed <= episodes.length + 100) {
-                    epNum = parsed;
+            const epUrl = ep.url || ep.link || '';
+            const epName = String(ep.name || ep.title || ep.episode || '');
+            if (!epUrl) continue;
+
+            const fallbackNum = isDescending ? (episodes.length - i) : (i + 1);
+            let epNum = fallbackNum;
+
+            // 1. Try matching epName (e.g. "Episode 12", "Ep 12", "12")
+            if (epName) {
+                const nameMatch = epName.match(/(?:ep|episode|#)\s*(\d+)\b/i) || epName.match(/\b(\d+)\b/);
+                if (nameMatch) {
+                    const parsed = parseInt(nameMatch[1]);
+                    if (!isNaN(parsed) && parsed > 0 && parsed <= episodes.length + 100) {
+                        epNum = parsed;
+                    }
                 }
             }
-            if (!epUrl) continue;
+            
+            // 2. If epName gave no match, try epUrl (e.g. "...-episode-12", ".../ep-12")
+            if (epNum === fallbackNum && epUrl) {
+                const urlMatch = epUrl.match(/(?:episode|ep)[._-]?(\d+)\b/i) || epUrl.match(/[\/_-](\d+)(?:[.\/]?$|\?)/);
+                if (urlMatch) {
+                    const parsed = parseInt(urlMatch[1]);
+                    if (!isNaN(parsed) && parsed > 0 && parsed <= episodes.length + 100) {
+                        epNum = parsed;
+                    }
+                }
+            }
 
             try {
                 const videos = await runner.getVideoList(epUrl);
