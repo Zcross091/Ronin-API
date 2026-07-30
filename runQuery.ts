@@ -39,18 +39,63 @@ const serverStr = process.argv[3] || '1';
 const episodeStr = process.argv[4] || '';
 const forceSource = process.argv[5] || '';
 
+let primaryQueryTitle = query || '';
+
 if (!query) {
     console.error('❌ Usage: ts-node runQuery.ts "anime title" [server] [episode] [forceSource]');
     process.exit(1);
 }
 
+// ── Automated Title Variant Resolver ──
+async function getSearchVariants(searchQuery: string): Promise<string[]> {
+    const titles = new Set<string>();
+    titles.add(searchQuery);
+    try {
+        const res = await axios.post('https://graphql.anilist.co', {
+            query: `query ($search: String) {
+                Media (search: $search, type: ANIME) {
+                    title { romaji english native }
+                    synonyms
+                }
+            }`,
+            variables: { search: searchQuery }
+        }, { timeout: 3500 });
+        
+        const media = res.data?.data?.Media;
+        if (media) {
+            if (media.title?.romaji) titles.add(media.title.romaji);
+            if (media.title?.english) titles.add(media.title.english);
+            if (Array.isArray(media.synonyms)) {
+                media.synonyms.forEach((s: string) => {
+                    if (s && s.length < 60 && !/[^\x00-\x7F]/.test(s)) titles.add(s);
+                });
+            }
+        }
+    } catch (e) {
+        // Fallback to initial query if AniList offline
+    }
+    return Array.from(titles);
+}
+
 async function saveToSupabase(title: string, episode: number, type: string, url: string) {
+    const cleanTitle = title.toLowerCase().trim();
     const { error } = await supabase.from('anime_links').upsert(
-        { title: title.toLowerCase().trim(), episode, type, url },
+        { title: cleanTitle, episode, type, url },
         { onConflict: 'title, episode, type' }
     );
     if (error) console.error(`❌ Supabase error:`, error.message);
-    else console.log(`✅ Saved: [${title}] Ep ${episode} (${type})`);
+    else console.log(`✅ Saved: [${cleanTitle}] Ep ${episode} (${type})`);
+
+    // Save under primary query title as well if variant differs
+    if (primaryQueryTitle && primaryQueryTitle.toLowerCase().trim() !== cleanTitle) {
+        const primaryClean = primaryQueryTitle.toLowerCase().trim();
+        try {
+            await supabase.from('anime_links').upsert(
+                { title: primaryClean, episode, type, url },
+                { onConflict: 'title, episode, type' }
+            );
+        } catch (e) {}
+    }
 }
 
 async function scrapeAnimePage(browser: any, animeUrl: string, domain: string): Promise<number> {
@@ -619,55 +664,69 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
             process.exit(1);
         }
     } else {
-        // Run prioritized HiAnime Direct miner first, and fallback to GogoAnime
-        console.log(`\n⏳ Step 1: Trying HiAnime Direct Scraper...`);
-        const hianimeDirectSuccess = await mineFromHianimeDirect(query, episodeStr);
-        
-        let gogoSuccess = false;
-        if (!hianimeDirectSuccess) {
-            console.log(`\n⚠️ HiAnime Direct failed or returned no episodes. Falling back to GogoAnime...`);
-            gogoSuccess = await mineFromGogo(query);
-        }
+        const titleVariants = await getSearchVariants(query);
+        console.log(`\n🔍 Resolved Title Variants for "${query}":`, titleVariants);
 
-        let extensionSuccess = false;
-        if (!hianimeDirectSuccess && !gogoSuccess) {
-            console.log(`\n⏳ Step 3: Running Extension Waterfall (Lightweight JS Engines)...`);
-            const targetEp = parseInt(episodeStr) || 1;
-            for (const extName of ['allanime', 'animegg', 'kisskh', 'sudatchi', 'animeonsen', 'animetsu', 'autoembed']) {
-                console.log(`🔍 [Waterfall Fallback] Trying extension "${extName}" for "${query}"...`);
-                try {
-                    const { minedCount } = await mineExtensionAllEpisodes(extName, query, targetEp, saveToSupabase);
-                    if (minedCount > 0) {
-                        console.log(`🎉 Extension "${extName}" successfully mined ${minedCount} episodes!`);
-                        extensionSuccess = true;
-                        break;
+        let overallMined = false;
+        for (const titleVar of titleVariants) {
+            console.log(`\n=================================================`);
+            console.log(`🚀 Mining Pass with Title Variant: "${titleVar}"`);
+            console.log(`=================================================`);
+
+            console.log(`\n⏳ Step 1: Trying HiAnime Direct Scraper...`);
+            const hianimeDirectSuccess = await mineFromHianimeDirect(titleVar, episodeStr);
+            
+            let gogoSuccess = false;
+            if (!hianimeDirectSuccess) {
+                console.log(`\n⚠️ HiAnime Direct returned no episodes. Falling back to GogoAnime for "${titleVar}"...`);
+                gogoSuccess = await mineFromGogo(titleVar);
+            }
+
+            let extensionSuccess = false;
+            if (!hianimeDirectSuccess && !gogoSuccess) {
+                console.log(`\n⏳ Step 2: Running Extension Waterfall for "${titleVar}"...`);
+                const targetEp = parseInt(episodeStr) || 1;
+                for (const extName of ['allanime', 'animegg', 'kisskh', 'sudatchi', 'animeonsen', 'animetsu', 'autoembed']) {
+                    try {
+                        const { minedCount } = await mineExtensionAllEpisodes(extName, titleVar, targetEp, saveToSupabase);
+                        if (minedCount > 0) {
+                            console.log(`🎉 Extension "${extName}" successfully mined ${minedCount} episodes for "${titleVar}"!`);
+                            extensionSuccess = true;
+                            break;
+                        }
+                    } catch (e: any) {
+                        console.log(`❌ Extension "${extName}" failed for "${titleVar}": ${e.message}`);
                     }
-                } catch (e: any) {
-                    console.log(`❌ Extension "${extName}" failed: ${e.message}`);
                 }
             }
-        }
 
-        console.log(`\n⏳ Step 4: Mining Nyaa & Aniwave (As alternatives)...`);
-        const [nyaaSuccess, aniwaveSuccess] = await Promise.all([
-            mineFromNyaa(query),
-            mineFromAniwave(query, episodeStr)
-        ]);
+            console.log(`\n⏳ Step 3: Mining Nyaa & Aniwave...`);
+            const [nyaaSuccess, aniwaveSuccess] = await Promise.all([
+                mineFromNyaa(titleVar),
+                mineFromAniwave(titleVar, episodeStr)
+            ]);
 
-        // ── Step 5: Mine Dub version if query is not already a Dub request ──
-        if (!query.toLowerCase().endsWith(' dub')) {
-            console.log(`\n🎙️ Step 5: Checking and mining Dub version for "${query}"...`);
-            try {
-                const targetEp = parseInt(episodeStr) || 1;
-                await mineFromGogo(`${query} dub`);
-                await mineExtensionAllEpisodes('allanime', `${query} dub`, targetEp, saveToSupabase);
-            } catch (dubErr: any) {
-                console.log(`ℹ️ Dub mining notice: ${dubErr.message}`);
+            if (hianimeDirectSuccess || gogoSuccess || extensionSuccess || nyaaSuccess || aniwaveSuccess) {
+                overallMined = true;
+                console.log(`🎉 Successfully mined streams using title variant: "${titleVar}"!`);
+                
+                // Mine Dub version for this successful title variant
+                if (!query.toLowerCase().endsWith(' dub')) {
+                    console.log(`\n🎙️ Step 4: Checking and mining Dub version for "${titleVar}"...`);
+                    try {
+                        const targetEp = parseInt(episodeStr) || 1;
+                        await mineFromGogo(`${titleVar} dub`);
+                        await mineExtensionAllEpisodes('allanime', `${titleVar} dub`, targetEp, saveToSupabase);
+                    } catch (dubErr: any) {
+                        console.log(`ℹ️ Dub mining notice: ${dubErr.message}`);
+                    }
+                }
+                break;
             }
         }
 
-        if (!hianimeDirectSuccess && !gogoSuccess && !extensionSuccess && !nyaaSuccess && !aniwaveSuccess) {
-            console.error(`❌ All sources failed for: "${query}"`);
+        if (!overallMined) {
+            console.error(`❌ All sources failed for: "${query}" across all title variants.`);
             process.exit(1);
         }
     }
