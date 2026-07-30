@@ -1,7 +1,8 @@
 name: Ronin On-Demand Mining
 on:
   schedule:
-    - cron: '10 17 * * *' # Daily auto-crawl at 17:10 UTC (10:40 PM IST)
+    - cron: '0 5 * * *'   # Twice-daily auto-crawl at 05:00 UTC (10:30 AM IST)
+    - cron: '10 17 * * *' # Twice-daily auto-crawl at 17:10 UTC (10:40 PM IST)
   repository_dispatch:
     types: [search-or-mine]
   workflow_dispatch:
@@ -9,20 +10,27 @@ on:
       query:
         description: 'Anime title to mine'
         required: false
+      episode:
+        description: 'Episode number'
+        required: false
+      source:
+        description: 'Source override'
+        required: false
+
 jobs:
   mine:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
 
       - name: Install deps
-        run: |
-          npm install
+        run: npm ci || npm install
 
       - name: Install ts-node
         run: npm install -g ts-node typescript
@@ -30,11 +38,11 @@ jobs:
       - name: Run miner
         run: |
           QUERY="${{ github.event.client_payload.query || github.event.inputs.query }}"
-          EPISODE="${{ github.event.client_payload.episode || '' }}"
-          SOURCE="${{ github.event.client_payload.source || '' }}"
+          EPISODE="${{ github.event.client_payload.episode || github.event.inputs.episode }}"
+          SOURCE="${{ github.event.client_payload.source || github.event.inputs.source }}"
           
           if [ -z "$QUERY" ]; then
-            echo "No query provided. Starting Crawler Mode..."
+            echo "No query provided. Starting Fast Auto-Crawler Mode..."
             ts-node crawler.ts
           else
             echo "Mining for: $QUERY (Episode: $EPISODE, Source: $SOURCE)"
@@ -43,9 +51,9 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          GOGO_DOMAINS: ${{ secrets.GOGO_DOMAINS }}
-          ANIWAVE_CLUSTER: ${{ secrets.ANIWAVE_CLUSTER }}
-          HIANIME_CLUSTER: ${{ secrets.HIANIME_CLUSTER }}
-          ANILIST_ACTIVE_DOMAIN: ${{ secrets.ANILIST_ACTIVE_DOMAIN }}
+          GOGO_DOMAINS: ${{ secrets.GOGO_DOMAINS || 'https://gogoanime.or.at,https://gogoanimes.cv,https://gogoanime.ist,https://gogoanime.cl' }}
+          ANIWAVE_CLUSTER: ${{ secrets.ANIWAVE_CLUSTER || 'https://aniwave.to,https://aniwave.com.pl,https://aniwave.dk' }}
+          HIANIME_CLUSTER: ${{ secrets.HIANIME_CLUSTER || 'https://hianimes.ru,https://hianime.to,https://hianime.sk' }}
+          ANILIST_ACTIVE_DOMAIN: ${{ secrets.ANILIST_ACTIVE_DOMAIN || 'https://graphql.anilist.co' }}
           MYANIMELIST_ACTIVE_DOMAIN: ${{ secrets.MYANIMELIST_ACTIVE_DOMAIN }}
-          NYAASI_ACTIVE_DOMAIN: ${{ secrets.NYAASI_ACTIVE_DOMAIN }}
+          NYAASI_ACTIVE_DOMAIN: ${{ secrets.NYAASI_ACTIVE_DOMAIN || 'https://nyaa.si' }}
