@@ -5,6 +5,7 @@ import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { waterfallMine, mineExtensionAllEpisodes } from './engine/waterfall';
+import { scrapeGogoanimeLight } from './scrapers/gogoanimeLight';
 
 dotenv.config();
 puppeteer.use(StealthPlugin());
@@ -673,13 +674,19 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
             console.log(`🚀 Mining Pass with Title Variant: "${titleVar}"`);
             console.log(`=================================================`);
 
-            console.log(`\n⏳ Step 1: Trying HiAnime Direct Scraper...`);
-            const hianimeDirectSuccess = await mineFromHianimeDirect(titleVar, episodeStr);
-            
-            let gogoSuccess = false;
-            if (!hianimeDirectSuccess) {
-                console.log(`\n⚠️ HiAnime Direct returned no episodes. Falling back to GogoAnime for "${titleVar}"...`);
-                gogoSuccess = await mineFromGogo(titleVar);
+            console.log(`\n⏳ Step 1: Running Instant Gogoanime Scraper...`);
+            const targetEp = parseInt(episodeStr) || 1;
+            const fastGogoResult = await scrapeGogoanimeLight(titleVar, targetEp, GOGO_DOMAINS);
+            let gogoSuccess = !!fastGogoResult;
+
+            let hianimeDirectSuccess = false;
+            if (!gogoSuccess) {
+                console.log(`\n⏳ Trying HiAnime Direct Scraper for "${titleVar}"...`);
+                hianimeDirectSuccess = await mineFromHianimeDirect(titleVar, episodeStr);
+                if (!hianimeDirectSuccess) {
+                    console.log(`\n⚠️ Falling back to GogoAnime Puppeteer for "${titleVar}"...`);
+                    gogoSuccess = await mineFromGogo(titleVar);
+                }
             }
 
             let extensionSuccess = false;
