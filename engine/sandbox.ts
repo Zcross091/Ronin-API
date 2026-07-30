@@ -3,12 +3,29 @@ import fs from 'fs/promises';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 
+class DocumentPolyfill {
+    constructor(html: string = '') {
+        const $ = cheerio.load(html || '');
+        return $;
+    }
+}
+
+class DOMParserPolyfill {
+    parseFromString(html: string) {
+        return cheerio.load(html || '');
+    }
+}
+
 // Polyfills for Mangayomi JS environment
 class Client {
     async get(url: string, headers: any = {}) {
         try {
-            headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-            const res = await axios.get(url, { headers });
+            headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+            if (url.includes('allanime')) {
+                headers["Referer"] = "https://allanime.to";
+                headers["Origin"] = "https://allanime.to";
+            }
+            const res = await axios.get(url, { headers, timeout: 10000 });
             return { body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data) };
         } catch (e: any) {
             console.error("Client GET Error:", url, e.message);
@@ -17,7 +34,12 @@ class Client {
     }
     async post(url: string, headers: any = {}, body: any = null) {
         try {
-            const res = await axios.post(url, body, { headers });
+            headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+            if (url.includes('allanime')) {
+                headers["Referer"] = "https://allanime.to";
+                headers["Origin"] = "https://allanime.to";
+            }
+            const res = await axios.post(url, body, { headers, timeout: 10000 });
             return { body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data) };
         } catch (e: any) {
             return { body: "" };
@@ -29,10 +51,11 @@ class SharedPreferences {
     get(key: string) { 
         if (key === "preferred_title_style") return "eng";
         if (key === "preferred_sub") return "sub";
+        if (key === "baseUrl" || key === "domain" || key === "host") return "https://kisskh.co";
         if (key === "alt_hoster_selection1") return ["player", "vidstreaming", "dood", "okru", "mp4upload"];
-        return null;
+        return "";
     }
-    getString(key: string) { return this.get(key); }
+    getString(key: string) { return this.get(key) || ""; }
     getStringList(key: string) { return this.get(key) || []; }
     getInt(key: string) { return 0; }
     set(key: string, value: string) {}
@@ -83,7 +106,8 @@ export class ExtensionRunner {
             JSON: JSON,
             parseInt: parseInt,
             parseFloat: parseFloat,
-            Document: cheerio, // Mangayomi sometimes exposes Document which acts like DOM
+            Document: DocumentPolyfill,
+            DOMParser: DOMParserPolyfill,
             mangayomiSources: []
         };
 
