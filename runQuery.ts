@@ -622,20 +622,22 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
 (async () => {
     console.log(`\n🚀 Ronin API One-Shot Query: "${query}" Server: ${serverStr} Ep: ${episodeStr} ForceSource: ${forceSource}\n`);
 
-    if (forceSource) {
+    // Always mine Nyaa torrents first regardless of source mode
+    try {
+        console.log(`\n🏴‍☠️ Always-On Nyaa Torrent Extraction for "${query}"...`);
+        await mineFromNyaa(query);
+    } catch (e: any) {
+        console.log(`⚠️ Nyaa torrent pass note: ${e.message}`);
+    }
+
+    if (forceSource && forceSource.toLowerCase() !== 'ronin' && forceSource.toLowerCase() !== 'main server') {
         console.log(`\n⏳ Forcing Deep-Dive extraction from source "${forceSource}" for "${query}" (Requested Ep: ${episodeStr || '1'})...`);
         const targetEpNum = parseInt(episodeStr) || 1;
         try {
-            if (forceSource.toLowerCase() === 'gogoanime') {
-                console.log(`\n⏳ Mining all episodes from GogoAnime...`);
-                const gogoSuccess = await mineFromGogo(query);
-                if (gogoSuccess) {
-                    console.log(`\n✅ Deep-Dive GogoAnime mining completed for: "${query}"`);
-                    process.exit(0);
-                } else {
-                    console.error(`❌ Forced source "Gogoanime" failed to find streams for: "${query}"`);
-                    process.exit(1);
-                }
+            if (forceSource.toLowerCase() === 'gogoanime' || forceSource.toLowerCase() === 'gogoanime direct') {
+                console.log(`\n⏳ Mining from GogoAnime Light...`);
+                await scrapeGogoanimeLight(query, targetEpNum, GOGO_DOMAINS);
+                process.exit(0);
             } else {
                 const { minedCount } = await mineExtensionAllEpisodes(forceSource, query, targetEpNum, saveToSupabase);
                 if (minedCount > 0) {
