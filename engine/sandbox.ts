@@ -16,33 +16,90 @@ class DOMParserPolyfill {
     }
 }
 
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+
+puppeteer.use(StealthPlugin());
+
+let sharedBrowser: any = null;
+
+async function getSharedBrowser() {
+    if (!sharedBrowser || !sharedBrowser.connected) {
+        sharedBrowser = await puppeteer.launch({
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+            ]
+        });
+    }
+    return sharedBrowser;
+}
+
+async function fetchWithPuppeteer(url: string, extraHeaders: any = {}): Promise<string> {
+    try {
+        const browser = await getSharedBrowser();
+        const page = await browser.newPage();
+        if (extraHeaders && Object.keys(extraHeaders).length > 0) {
+            await page.setExtraHTTPHeaders(extraHeaders);
+        }
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
+        const content = await page.evaluate(() => {
+            const pre = document.querySelector('pre');
+            if (pre) return pre.innerText;
+            return document.body ? document.body.innerText : '';
+        });
+        await page.close();
+        return content.trim();
+    } catch (e: any) {
+        console.error(`Puppeteer fetch failed for ${url}:`, e.message);
+        return '';
+    }
+}
+
 // Polyfills for Mangayomi JS environment
 class Client {
     async get(url: string, headers: any = {}) {
+        headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+        if (url.includes('allanime')) {
+            headers["Referer"] = "https://allanime.to";
+            headers["Origin"] = "https://allanime.to";
+        }
         try {
-            headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
-            if (url.includes('allanime')) {
-                headers["Referer"] = "https://allanime.to";
-                headers["Origin"] = "https://allanime.to";
-            }
             const res = await axios.get(url, { headers, timeout: 10000 });
             return { body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data) };
         } catch (e: any) {
+            if (e.response?.status === 403 || e.code === 'ECONNRESET' || url.includes('allanime')) {
+                console.log(`⚠️ Client GET status ${e.response?.status || e.code} on ${url}. Attempting Puppeteer Stealth fallback...`);
+                const body = await fetchWithPuppeteer(url, headers);
+                if (body && body.startsWith('{')) {
+                    return { body };
+                }
+            }
             console.error("Client GET Error:", url, e.message);
-            return { body: "" };
+            return { body: '{"data":null}' };
         }
     }
     async post(url: string, headers: any = {}, body: any = null) {
+        headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+        if (url.includes('allanime')) {
+            headers["Referer"] = "https://allanime.to";
+            headers["Origin"] = "https://allanime.to";
+        }
         try {
-            headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
-            if (url.includes('allanime')) {
-                headers["Referer"] = "https://allanime.to";
-                headers["Origin"] = "https://allanime.to";
-            }
             const res = await axios.post(url, body, { headers, timeout: 10000 });
             return { body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data) };
         } catch (e: any) {
-            return { body: "" };
+            if (e.response?.status === 403 || e.code === 'ECONNRESET' || url.includes('allanime')) {
+                console.log(`⚠️ Client POST status ${e.response?.status || e.code} on ${url}. Attempting Puppeteer Stealth fallback...`);
+                const puppeteerBody = await fetchWithPuppeteer(url, headers);
+                if (puppeteerBody && puppeteerBody.startsWith('{')) {
+                    return { body: puppeteerBody };
+                }
+            }
+            return { body: '{"data":null}' };
         }
     }
 }
