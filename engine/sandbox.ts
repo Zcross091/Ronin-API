@@ -6,13 +6,40 @@ import * as cheerio from 'cheerio';
 class DocumentPolyfill {
     constructor(html: string = '') {
         const $ = cheerio.load(html || '');
-        return $;
+        const wrapNode = (node: any): any => {
+            if (!node || node.length === 0) {
+                const emptyArr: any[] = [];
+                (emptyArr as any).select = () => [];
+                (emptyArr as any).selectFirst = () => null;
+                (emptyArr as any).getSrc = '';
+                (emptyArr as any).getHref = '';
+                (emptyArr as any).text = '';
+                return emptyArr;
+            }
+            const el = $(node);
+            const resNode: any = {
+                select: (sel: string) => {
+                    const found = el.find(sel).toArray().map((child: any) => wrapNode(child));
+                    (found as any).select = (s: string) => el.find(s).toArray().map((c: any) => wrapNode(c));
+                    return found;
+                },
+                selectFirst: (sel: string) => wrapNode(el.find(sel).first()),
+                get getSrc() { return el.attr('src') || el.attr('data-src') || ''; },
+                get getHref() { return el.attr('href') || ''; },
+                get text() { return el.text().trim(); },
+                attr: (name: string) => el.attr(name),
+                textStr: el.text().trim(),
+                length: el.length
+            };
+            return resNode;
+        };
+        return wrapNode($.root());
     }
 }
 
 class DOMParserPolyfill {
     parseFromString(html: string) {
-        return cheerio.load(html || '');
+        return new DocumentPolyfill(html);
     }
 }
 
@@ -62,8 +89,13 @@ async function fetchWithPuppeteer(url: string, extraHeaders: any = {}): Promise<
 
 // Polyfills for Mangayomi JS environment
 class Client {
-    async get(url: string, headers: any = {}) {
-        headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+    async get(url: string, headersArg: any = {}) {
+        let headers = headersArg.headers || headersArg || {};
+        if (url.startsWith('/')) {
+            const baseUrl = headers["Referer"] || headers["Origin"] || "https://kisskh.co";
+            url = baseUrl.replace(/\/$/, '') + url;
+        }
+        headers["User-Agent"] = headers["User-Agent"] || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
         if (url.includes('allanime')) {
             headers["Referer"] = "https://allanime.to";
             headers["Origin"] = "https://allanime.to";
@@ -72,10 +104,10 @@ class Client {
             const res = await axios.get(url, { headers, timeout: 10000 });
             return { body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data) };
         } catch (e: any) {
-            if (e.response?.status === 403 || e.code === 'ECONNRESET' || url.includes('allanime')) {
+            if (e.response?.status === 403 || e.code === 'ECONNRESET' || url.includes('allanime') || url.includes('sudatchi') || url.includes('animeonsen')) {
                 console.log(`⚠️ Client GET status ${e.response?.status || e.code} on ${url}. Attempting Puppeteer Stealth fallback...`);
                 const body = await fetchWithPuppeteer(url, headers);
-                if (body && body.startsWith('{')) {
+                if (body && (body.startsWith('{') || body.startsWith('['))) {
                     return { body };
                 }
             }
@@ -83,8 +115,13 @@ class Client {
             return { body: '{"data":null}' };
         }
     }
-    async post(url: string, headers: any = {}, body: any = null) {
-        headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+    async post(url: string, headersArg: any = {}, body: any = null) {
+        let headers = headersArg.headers || headersArg || {};
+        if (url.startsWith('/')) {
+            const baseUrl = headers["Referer"] || headers["Origin"] || "https://kisskh.co";
+            url = baseUrl.replace(/\/$/, '') + url;
+        }
+        headers["User-Agent"] = headers["User-Agent"] || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
         if (url.includes('allanime')) {
             headers["Referer"] = "https://allanime.to";
             headers["Origin"] = "https://allanime.to";
@@ -93,10 +130,10 @@ class Client {
             const res = await axios.post(url, body, { headers, timeout: 10000 });
             return { body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data) };
         } catch (e: any) {
-            if (e.response?.status === 403 || e.code === 'ECONNRESET' || url.includes('allanime')) {
+            if (e.response?.status === 403 || e.code === 'ECONNRESET' || url.includes('allanime') || url.includes('sudatchi') || url.includes('animeonsen')) {
                 console.log(`⚠️ Client POST status ${e.response?.status || e.code} on ${url}. Attempting Puppeteer Stealth fallback...`);
                 const puppeteerBody = await fetchWithPuppeteer(url, headers);
-                if (puppeteerBody && puppeteerBody.startsWith('{')) {
+                if (puppeteerBody && (puppeteerBody.startsWith('{') || puppeteerBody.startsWith('['))) {
                     return { body: puppeteerBody };
                 }
             }
@@ -109,8 +146,13 @@ class SharedPreferences {
     get(key: string) { 
         if (key === "preferred_title_style") return "eng";
         if (key === "preferred_sub") return "sub";
-        if (key === "baseUrl" || key === "domain" || key === "host") return "https://kisskh.co";
         if (key === "alt_hoster_selection1") return ["player", "vidstreaming", "dood", "okru", "mp4upload"];
+        if (key.includes("kisskh") || key.includes("kiss")) return "https://kisskh.co";
+        if (key.includes("animetsu")) return "https://animetsu.bz";
+        if (key.includes("animeonsen")) return "https://animeonsen.xyz";
+        if (key.includes("sudatchi")) return "https://sudatchi.com";
+        if (key.includes("animegg")) return "https://www.animegg.org";
+        if (key.includes("base_url") || key === "baseUrl" || key === "domain" || key === "host") return "https://kisskh.co";
         return "";
     }
     getString(key: string) { return this.get(key) || ""; }
