@@ -25,7 +25,7 @@ class DefaultExtension extends MProvider {
         for (const apiUrl of apiUrls) {
             try {
                 const res = await new Client().get(apiUrl + body, { "Referer": baseUrl });
-                if (res && res.body && res.body.includes('"data"')) {
+                if (res && res.body && res.body.includes('"data"') && !res.body.includes('"data":null')) {
                     return res.body;
                 }
             } catch (e) {}

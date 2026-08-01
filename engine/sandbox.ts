@@ -46,6 +46,7 @@ async function fetchWithPuppeteer(url: string, extraHeaders: any = {}): Promise<
             await page.setExtraHTTPHeaders(extraHeaders);
         }
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
+        await new Promise(r => setTimeout(r, 2500));
         const content = await page.evaluate(() => {
             const pre = document.querySelector('pre');
             if (pre) return pre.innerText;
