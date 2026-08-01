@@ -4,7 +4,7 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import { waterfallMine, mineExtensionAllEpisodes } from './engine/waterfall';
+import { waterfallMine, mineExtensionAllEpisodes, EXTENSION_WATERFALL } from './engine/waterfall';
 import { scrapeGogoanimeLight } from './scrapers/gogoanimeLight';
 
 dotenv.config();
@@ -695,7 +695,7 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
             if (!hianimeDirectSuccess && !gogoSuccess) {
                 console.log(`\n⏳ Step 2: Running Extension Waterfall for "${titleVar}"...`);
                 const targetEp = parseInt(episodeStr) || 1;
-                for (const extName of ['allanime', 'animegg', 'kisskh', 'sudatchi', 'animeonsen', 'animetsu', 'autoembed']) {
+                for (const extName of EXTENSION_WATERFALL) {
                     try {
                         const { minedCount } = await mineExtensionAllEpisodes(extName, titleVar, targetEp, saveToSupabase);
                         if (minedCount > 0) {

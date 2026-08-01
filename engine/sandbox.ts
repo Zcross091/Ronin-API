@@ -6,6 +6,7 @@ import * as cheerio from 'cheerio';
 class DocumentPolyfill {
     constructor(html: string = '') {
         const $ = cheerio.load(html || '');
+        const rawHtml = html || '';
         const wrapNode = (node: any): any => {
             if (!node || node.length === 0) {
                 const emptyArr: any[] = [];
@@ -14,6 +15,11 @@ class DocumentPolyfill {
                 (emptyArr as any).getSrc = '';
                 (emptyArr as any).getHref = '';
                 (emptyArr as any).text = '';
+                (emptyArr as any).html = '';
+                (emptyArr as any).className = '';
+                (emptyArr as any).attr = () => '';
+                (emptyArr as any).forEach = Array.prototype.forEach;
+                (emptyArr as any).reverse = Array.prototype.reverse;
                 return emptyArr;
             }
             const el = $(node);
@@ -21,13 +27,22 @@ class DocumentPolyfill {
                 select: (sel: string) => {
                     const found = el.find(sel).toArray().map((child: any) => wrapNode(child));
                     (found as any).select = (s: string) => el.find(s).toArray().map((c: any) => wrapNode(c));
+                    (found as any).selectFirst = (s: string) => {
+                        const items = el.find(s).toArray();
+                        return items.length > 0 ? wrapNode(items[0]) : null;
+                    };
                     return found;
                 },
-                selectFirst: (sel: string) => wrapNode(el.find(sel).first()),
+                selectFirst: (sel: string) => {
+                    const found = el.find(sel).first();
+                    return found.length > 0 ? wrapNode(found) : null;
+                },
                 get getSrc() { return el.attr('src') || el.attr('data-src') || ''; },
                 get getHref() { return el.attr('href') || ''; },
                 get text() { return el.text().trim(); },
-                attr: (name: string) => el.attr(name),
+                get html() { return $.html(el) || rawHtml; },
+                get className() { return el.attr('class') || ''; },
+                attr: (name: string) => el.attr(name) || '',
                 textStr: el.text().trim(),
                 length: el.length
             };
@@ -102,17 +117,17 @@ class Client {
         }
         try {
             const res = await axios.get(url, { headers, timeout: 10000 });
-            return { body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data) };
+            return { body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data), statusCode: res.status || 200 };
         } catch (e: any) {
             if (e.response?.status === 403 || e.code === 'ECONNRESET' || url.includes('allanime') || url.includes('sudatchi') || url.includes('animeonsen')) {
                 console.log(`⚠️ Client GET status ${e.response?.status || e.code} on ${url}. Attempting Puppeteer Stealth fallback...`);
                 const body = await fetchWithPuppeteer(url, headers);
                 if (body && (body.startsWith('{') || body.startsWith('['))) {
-                    return { body };
+                    return { body, statusCode: 200 };
                 }
             }
             console.error("Client GET Error:", url, e.message);
-            return { body: '{"data":null}' };
+            return { body: '{"data":null}', statusCode: e.response?.status || 0 };
         }
     }
     async post(url: string, headersArg: any = {}, body: any = null) {
@@ -128,16 +143,16 @@ class Client {
         }
         try {
             const res = await axios.post(url, body, { headers, timeout: 10000 });
-            return { body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data) };
+            return { body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data), statusCode: res.status || 200 };
         } catch (e: any) {
             if (e.response?.status === 403 || e.code === 'ECONNRESET' || url.includes('allanime') || url.includes('sudatchi') || url.includes('animeonsen')) {
                 console.log(`⚠️ Client POST status ${e.response?.status || e.code} on ${url}. Attempting Puppeteer Stealth fallback...`);
                 const puppeteerBody = await fetchWithPuppeteer(url, headers);
                 if (puppeteerBody && (puppeteerBody.startsWith('{') || puppeteerBody.startsWith('['))) {
-                    return { body: puppeteerBody };
+                    return { body: puppeteerBody, statusCode: 200 };
                 }
             }
-            return { body: '{"data":null}' };
+            return { body: '{"data":null}', statusCode: e.response?.status || 0 };
         }
     }
 }
@@ -147,11 +162,18 @@ class SharedPreferences {
         if (key === "preferred_title_style") return "eng";
         if (key === "preferred_sub") return "sub";
         if (key === "alt_hoster_selection1") return ["player", "vidstreaming", "dood", "okru", "mp4upload"];
+        // Extension-specific base URL defaults
         if (key.includes("kisskh") || key.includes("kiss")) return "https://kisskh.co";
         if (key.includes("animetsu")) return "https://animetsu.bz";
         if (key.includes("animeonsen")) return "https://animeonsen.xyz";
         if (key.includes("sudatchi")) return "https://sudatchi.com";
         if (key.includes("animegg")) return "https://www.animegg.org";
+        if (key.includes("subsplease")) return "1080"; // default resolution preference
+        if (key.includes("anidb")) return "true"; // include other audio streams
+        if (key.includes("animeparadise")) return "https://animeparadise.moe";
+        if (key.includes("animez")) return "https://animez.org";
+        if (key.includes("anikoto")) return "https://anikoto.com";
+        if (key.includes("senshi")) return "https://senshi.tv";
         if (key.includes("base_url") || key === "baseUrl" || key === "domain" || key === "host") return "https://kisskh.co";
         return "";
     }

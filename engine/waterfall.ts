@@ -15,6 +15,8 @@ export const EXTENSION_WATERFALL: string[] = [
     'allanime',
     'kisskh',
     'senshi',
+    'subsplease',
+    'anidb',
     'autoembed',
 ];
 
@@ -86,8 +88,8 @@ async function tryExtension(
         const detail = await runner.getDetail(detailUrl);
         if (!detail) return { url: null, error: 'Could not fetch detail' };
 
-        // Step 3: Find the matching episode
-        const episodes = detail.episodes || [];
+        // Step 3: Find the matching episode (some extensions use 'chapters' instead of 'episodes')
+        const episodes = detail.episodes || detail.chapters || [];
         let episodeUrl: string | null = null;
 
         for (const ep of episodes) {
@@ -260,9 +262,9 @@ export async function mineExtensionAllEpisodes(
         if (!detailUrl) return { minedCount: 0 };
 
         const detail = await runner.getDetail(detailUrl);
-        if (!detail || !detail.episodes || detail.episodes.length === 0) return { minedCount: 0 };
+        if (!detail || (!detail.episodes && !detail.chapters) || (detail.episodes || detail.chapters || []).length === 0) return { minedCount: 0 };
 
-        const episodes = detail.episodes;
+        const episodes = detail.episodes || detail.chapters;
 
         // ── Detect Array Ordering (Ascending vs Descending) ──
         let isDescending = false;
