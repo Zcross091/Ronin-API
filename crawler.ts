@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import path from 'path';
 
+import { mineTrendingAndPopular } from './scrapers/anime/gogoanime';
+
 dotenv.config();
 
 const supabaseUrl = process.env.SUPABASE_URL || "";
@@ -24,7 +26,15 @@ const EXTENSION_PATH = path.join(__dirname, 'extensions/m2k3a-extensions/javascr
 
 async function runCrawler() {
     console.log(`\n🕸️ Starting Ronin Fast Auto-Crawler 🕸️`);
-    console.log(`Using primary extension: ${EXTENSION_PATH}`);
+    
+    // Phase 0: Deep Mine GogoAnime 200+ Trending & Popular Series
+    try {
+        await mineTrendingAndPopular(10);
+    } catch (gogoErr: any) {
+        console.error(`⚠️ GogoAnime Auto-Crawler phase failed:`, gogoErr.message);
+    }
+
+    console.log(`\nUsing primary extension: ${EXTENSION_PATH}`);
     
     let runner: ExtensionRunner;
     try {

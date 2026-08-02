@@ -1,5 +1,6 @@
 // GogoAnime Scraper (Primary Priority Engine for Ronin API)
-// Automatically caches all extracted stream links to Supabase DB
+// DEEP MINER ENGINE: When an anime is touched, mines ALL episodes of that series into Supabase.
+// In Auto-Crawler Mode: Deep mines 200+ trending & popular series.
 
 const axios = require('axios');
 const cheerio = require('cheerio');
@@ -66,7 +67,7 @@ async function search(params) {
       $('ul.items li').each((i, el) => {
         const a = $(el).find('p.name a');
         const img = $(el).find('div.img a img').attr('src');
-        const title = a.text();
+        const title = a.text().trim();
         const href = a.attr('href') || '';
         const link = href.startsWith('http') ? href : baseUrl + href;
         const id = href.split('/').pop();
@@ -165,7 +166,6 @@ async function extractVideo(params) {
   const titleParam = params?.title || '';
   const episodeParam = params?.episode || 0;
 
-  // Extract episode number and title slug directly from the episode URL if not passed explicitly
   const epMatch = url.match(/(?:.*\/)?([^\/]+)-episode-(\d+)/i);
   const title = titleParam || (epMatch ? epMatch[1].replace(/-/g, ' ').toLowerCase().trim() : '');
   const epNum = episodeParam || (epMatch ? parseInt(epMatch[2]) : 1);
@@ -210,8 +210,7 @@ async function extractVideo(params) {
     });
   }
 
-  // ── AUTOMATIC SUPABASE CACHING ──
-  // Saves extracted stream URLs automatically whenever extractVideo is executed
+  // Caches stream URL to Supabase automatically
   if (sources.length > 0) {
     for (const src of sources) {
       if (src.url && src.url.startsWith('http')) {
@@ -226,52 +225,141 @@ async function extractVideo(params) {
   });
 }
 
-async function scrapeGogoanime(query, epNum, domains) {
+/**
+ * DEEP MINE FULL ANIME SERIES:
+ * When an anime is searched or requested, mines ALL episodes of that series into Supabase.
+ */
+async function scrapeGogoanime(query, epNum = 1, domains) {
   const activeDomains = (domains && domains.length > 0) ? domains : GOGO_DOMAINS;
-  const cleanQuery = query.toLowerCase().trim();
-  const querySlug = cleanQuery.replace(/[^a-z0-9]+/g, '-');
+  let targetStreamUrl = null;
 
   for (const domain of activeDomains) {
     try {
-      // Stage 1: Direct episode URL prediction first
-      const directEpUrl = `${domain}/${querySlug}-episode-${epNum}`;
-      try {
-        const videoResStr = await extractVideo({ url: directEpUrl, title: cleanQuery, episode: epNum });
-        const videoObj = JSON.parse(videoResStr);
-        const videoSources = videoObj.sources || [];
-        const validSource = videoSources.find(s => s.url && s.url.startsWith('http'));
-        if (validSource) {
-          console.log(`⚡ Instant Direct Gogo Match: [${query}] Ep ${epNum} -> ${validSource.url}`);
-          return validSource.url;
-        }
-      } catch (err) {}
-
-      // Stage 2: Full gogoanime.js search() & details() pipeline
       const searchResStr = await search({ query });
       const searchResults = JSON.parse(searchResStr);
       if (!searchResults || searchResults.length === 0) continue;
 
       const firstAnime = searchResults[0];
+      console.log(`\n🔥 DEEP MINING FULL SERIES: "${firstAnime.title}" (${firstAnime.url})`);
+
       const detailsStr = await details({ url: firstAnime.url });
       const detailsObj = JSON.parse(detailsStr);
       const episodes = detailsObj.episodes || [];
+      const seriesTitle = detailsObj.anime?.title || firstAnime.title;
 
-      const targetEp = episodes.find(e => e.number === epNum);
-      if (targetEp && targetEp.url) {
-        const videoResStr = await extractVideo({ url: targetEp.url, title: cleanQuery, episode: epNum });
-        const videoObj = JSON.parse(videoResStr);
-        const videoSources = videoObj.sources || [];
-        const validSource = videoSources.find(s => s.url && s.url.startsWith('http'));
-        if (validSource) {
-          console.log(`✅ Gogo Mined via gogoanime.js: [${query}] Ep ${epNum} -> ${validSource.url}`);
-          return validSource.url;
+      console.log(`   Found ${episodes.length} episodes for "${seriesTitle}". Deep mining all episodes...`);
+
+      for (const ep of episodes) {
+        try {
+          const videoResStr = await extractVideo({ url: ep.url, title: seriesTitle, episode: ep.number });
+          const videoObj = JSON.parse(videoResStr);
+          const videoSources = videoObj.sources || [];
+          const validSource = videoSources.find(s => s.url && s.url.startsWith('http'));
+
+          if (validSource && ep.number === epNum) {
+            targetStreamUrl = validSource.url;
+          }
+        } catch (epErr) {
+          // Continue mining remaining episodes
         }
       }
+
+      if (episodes.length > 0) {
+        console.log(`✅ Completed Deep Mine for "${seriesTitle}": ${episodes.length} episodes processed into Supabase.`);
+        return targetStreamUrl;
+      }
     } catch (e) {
-      console.error(`Gogoanime scraper failed on ${domain}: ${e.message}`);
+      console.error(`Gogoanime deep miner failed on ${domain}: ${e.message}`);
     }
   }
-  return null;
+  return targetStreamUrl;
+}
+
+/**
+ * AUTO-CRAWLER MODE:
+ * Deep mines 200+ trending releases & popular series from Gogoanime.
+ */
+async function mineTrendingAndPopular(maxPages = 10) {
+  console.log(`\n🕵️ [AUTO-CRAWLER] Deep Mining Trending & Popular Anime (Up to ${maxPages} pages / 200+ releases)...`);
+  const baseUrl = GOGO_DOMAINS[0] || "https://anitaku.pe";
+  const processedSeries = new Set();
+
+  // 1. Mine Recent Releases (200+ latest episodes)
+  for (let p = 1; p <= maxPages; p++) {
+    try {
+      console.log(`\n📄 Crawling Recent Releases Page ${p}...`);
+      const pageUrl = `${baseUrl}/page-${p}.html`;
+      const html = await fetchHtml(pageUrl);
+      const $ = cheerio.load(html);
+
+      const pageSeriesUrls = [];
+      $('ul.items li p.name a').each((_, el) => {
+        const href = $(el).attr('href') || '';
+        if (href) {
+          const fullUrl = href.startsWith('http') ? href : `${baseUrl}${href.startsWith('/') ? '' : '/'}${href}`;
+          pageSeriesUrls.push(fullUrl);
+        }
+      });
+
+      if (pageSeriesUrls.length === 0) break;
+
+      for (const seriesUrl of pageSeriesUrls) {
+        if (processedSeries.has(seriesUrl)) continue;
+        processedSeries.add(seriesUrl);
+
+        try {
+          const detailsStr = await details({ url: seriesUrl });
+          const detailsObj = JSON.parse(detailsStr);
+          const episodes = detailsObj.episodes || [];
+          const title = detailsObj.anime?.title || '';
+
+          if (episodes.length > 0) {
+            console.log(`\n💎 Deep Mining Series [${processedSeries.size}]: "${title}" (${episodes.length} episodes)`);
+            for (const ep of episodes) {
+              await extractVideo({ url: ep.url, title: title, episode: ep.number });
+            }
+          }
+        } catch (seriesErr) {}
+      }
+    } catch (pageErr) {
+      break;
+    }
+  }
+
+  // 2. Mine Popular Anime Catalog
+  for (let p = 1; p <= 5; p++) {
+    try {
+      console.log(`\n🔥 Crawling Popular Anime Page ${p}...`);
+      const popularUrl = `${baseUrl}/popular.html?page=${p}`;
+      const html = await fetchHtml(popularUrl);
+      const $ = cheerio.load(html);
+
+      $('ul.items li p.name a').each(async (_, el) => {
+        const href = $(el).attr('href') || '';
+        if (href) {
+          const seriesUrl = href.startsWith('http') ? href : `${baseUrl}${href.startsWith('/') ? '' : '/'}${href}`;
+          if (!processedSeries.has(seriesUrl)) {
+            processedSeries.add(seriesUrl);
+            try {
+              const detailsStr = await details({ url: seriesUrl });
+              const detailsObj = JSON.parse(detailsStr);
+              const episodes = detailsObj.episodes || [];
+              const title = detailsObj.anime?.title || '';
+              if (episodes.length > 0) {
+                for (const ep of episodes) {
+                  await extractVideo({ url: ep.url, title: title, episode: ep.number });
+                }
+              }
+            } catch (err) {}
+          }
+        }
+      });
+    } catch (popErr) {
+      break;
+    }
+  }
+
+  console.log(`\n🎉 Completed Auto-Crawler Deep Mine: Processed ${processedSeries.size} total series into Supabase!`);
 }
 
 module.exports = {
@@ -279,15 +367,20 @@ module.exports = {
   details,
   extractVideo,
   scrapeGogoanime,
-  scrapeGogoanimeLight: scrapeGogoanime
+  scrapeGogoanimeLight: scrapeGogoanime,
+  mineTrendingAndPopular
 };
 
 if (require.main === module) {
-  const query = process.argv[2] || "Solo Leveling";
+  const query = process.argv[2];
   const ep = parseInt(process.argv[3]) || 1;
-  console.log(`🚀 Independent CLI Miner: Searching for "${query}" Ep ${ep}...`);
-  scrapeGogoanime(query, ep).then(url => {
-    if (url) console.log(`🎉 SUCCESS Stream URL: ${url}`);
-    else console.log(`❌ No stream found for "${query}" Ep ${ep}`);
-  });
+  if (query) {
+    console.log(`🚀 Independent Deep Miner: Searching and Deep-Mining ALL episodes for "${query}"...`);
+    scrapeGogoanime(query, ep).then(url => {
+      if (url) console.log(`\n🎉 SUCCESS Ep ${ep} Stream: ${url}`);
+      else console.log(`\n⚠️ Mined series to Supabase (Requested Ep ${ep} url null)`);
+    });
+  } else {
+    mineTrendingAndPopular(10);
+  }
 }
