@@ -226,10 +226,10 @@ async function extractVideo(params) {
 }
 
 /**
- * DEEP MINE FULL ANIME SERIES:
- * When an anime is searched or requested, mines ALL episodes of that series into Supabase.
+ * DEEP MINE FULL ANIME SERIES (Sub + Dub Simultaneously):
+ * When an anime is searched or requested, mines ALL episodes of SUB and DUB concurrently via Promise.all.
  */
-async function scrapeGogoanime(query, epNum = 1, domains) {
+async function scrapeGogoanimeSingle(query, epNum = 1, domains) {
   const activeDomains = (domains && domains.length > 0) ? domains : GOGO_DOMAINS;
   let targetStreamUrl = null;
 
@@ -273,6 +273,22 @@ async function scrapeGogoanime(query, epNum = 1, domains) {
     }
   }
   return targetStreamUrl;
+}
+
+async function scrapeGogoanime(query, epNum = 1, domains) {
+  const isDubQuery = query.toLowerCase().includes('dub');
+  
+  if (isDubQuery) {
+    return await scrapeGogoanimeSingle(query, epNum, domains);
+  }
+  
+  console.log(`\n⚡ Simultaneous Dual Sub + Dub Parallel Mining for: "${query}"...`);
+  const [subUrl, dubUrl] = await Promise.all([
+    scrapeGogoanimeSingle(query, epNum, domains),
+    scrapeGogoanimeSingle(`${query} dub`, epNum, domains)
+  ]);
+
+  return subUrl || dubUrl;
 }
 
 /**
