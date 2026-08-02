@@ -1,8 +1,9 @@
 name: Ronin On-Demand Mining
 on:
   schedule:
-    - cron: '0 5 * * *'   # Twice-daily auto-crawl at 05:00 UTC (10:30 AM IST)
-    - cron: '10 17 * * *' # Twice-daily auto-crawl at 17:10 UTC (10:40 PM IST)
+    - cron: '30 4 * * *'  # Thrice-daily auto-crawl at 04:30 UTC (10:00 AM IST)
+    - cron: '0 13 * * *'  # Thrice-daily auto-crawl at 13:00 UTC (6:30 PM IST)
+    - cron: '10 17 * * *' # Thrice-daily auto-crawl at 17:10 UTC (10:40 PM IST)
   repository_dispatch:
     types: [search-or-mine]
   workflow_dispatch:
