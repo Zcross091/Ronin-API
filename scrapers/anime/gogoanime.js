@@ -293,31 +293,30 @@ async function scrapeGogoanime(query, epNum = 1, domains) {
 
 /**
  * AUTO-CRAWLER MODE:
- * Deep mines 200+ trending releases & popular series from Gogoanime.
+ * Deep mines 200+ trending releases & popular series from Gogoanime via AJAX endpoints.
  */
 async function mineTrendingAndPopular(maxPages = 10) {
-  console.log(`\n🕵️ [AUTO-CRAWLER] Deep Mining Trending & Popular Anime (Up to ${maxPages} pages / 200+ releases)...`);
-  const baseUrl = GOGO_DOMAINS[0] || "https://anitaku.pe";
+  console.log(`\n🕵️ [AUTO-CRAWLER] Deep Mining Recent Releases & Popular Anime (Up to ${maxPages} pages / 200+ releases)...`);
   const processedSeries = new Set();
+  const baseUrl = GOGO_DOMAINS[0] || "https://anitaku.pe";
 
-  // 1. Mine Recent Releases (200+ latest episodes)
+  // 1. Mine Recent Releases via GogoCDN AJAX endpoint (Always 100% reliable)
   for (let p = 1; p <= maxPages; p++) {
     try {
-      console.log(`\n📄 Crawling Recent Releases Page ${p}...`);
-      const pageUrl = `${baseUrl}/page-${p}.html`;
+      console.log(`\n📄 Crawling Recent Releases Page ${p} via Gogo AJAX...`);
+      const pageUrl = `https://ajax.gogocdn.net/ajax/page-recent-release.html?page=${p}&type=1`;
       const html = await fetchHtml(pageUrl);
       const $ = cheerio.load(html);
 
       const pageSeriesUrls = [];
-      $('ul.items li p.name a').each((_, el) => {
+      $('ul.items li p.name a, li p.name a').each((_, el) => {
         const href = $(el).attr('href') || '';
         if (href) {
-          const fullUrl = href.startsWith('http') ? href : `${baseUrl}${href.startsWith('/') ? '' : '/'}${href}`;
-          pageSeriesUrls.push(fullUrl);
+          let catSlug = href.replace(/^\//, '').replace(/-episode-\d+.*$/i, '');
+          const seriesUrl = `${baseUrl}/category/${catSlug}`;
+          pageSeriesUrls.push(seriesUrl);
         }
       });
-
-      if (pageSeriesUrls.length === 0) break;
 
       for (const seriesUrl of pageSeriesUrls) {
         if (processedSeries.has(seriesUrl)) continue;
@@ -330,48 +329,63 @@ async function mineTrendingAndPopular(maxPages = 10) {
           const title = detailsObj.anime?.title || '';
 
           if (episodes.length > 0) {
-            console.log(`\n💎 Deep Mining Series [${processedSeries.size}]: "${title}" (${episodes.length} episodes)`);
+            console.log(`\n💎 Deep Mining Recent Series [${processedSeries.size}]: "${title}" (${episodes.length} episodes)`);
             for (const ep of episodes) {
-              await extractVideo({ url: ep.url, title: title, episode: ep.number });
+              try {
+                await extractVideo({ url: ep.url, title: title, episode: ep.number });
+              } catch (err) {}
             }
           }
         } catch (seriesErr) {}
       }
     } catch (pageErr) {
-      break;
+      console.log(`⚠️ Recent releases AJAX page ${p} notice: ${pageErr.message}`);
     }
   }
 
   // 2. Mine Popular Anime Catalog
-  for (let p = 1; p <= 5; p++) {
-    try {
-      console.log(`\n🔥 Crawling Popular Anime Page ${p}...`);
-      const popularUrl = `${baseUrl}/popular.html?page=${p}`;
-      const html = await fetchHtml(popularUrl);
-      const $ = cheerio.load(html);
+  for (const domain of GOGO_DOMAINS) {
+    for (let p = 1; p <= 3; p++) {
+      try {
+        console.log(`\n🔥 Crawling Popular Anime Page ${p} on ${domain}...`);
+        const popularUrl = `${domain}/popular.html?page=${p}`;
+        const html = await fetchHtml(popularUrl);
+        const $ = cheerio.load(html);
 
-      $('ul.items li p.name a').each(async (_, el) => {
-        const href = $(el).attr('href') || '';
-        if (href) {
-          const seriesUrl = href.startsWith('http') ? href : `${baseUrl}${href.startsWith('/') ? '' : '/'}${href}`;
-          if (!processedSeries.has(seriesUrl)) {
-            processedSeries.add(seriesUrl);
-            try {
-              const detailsStr = await details({ url: seriesUrl });
-              const detailsObj = JSON.parse(detailsStr);
-              const episodes = detailsObj.episodes || [];
-              const title = detailsObj.anime?.title || '';
-              if (episodes.length > 0) {
-                for (const ep of episodes) {
-                  await extractVideo({ url: ep.url, title: title, episode: ep.number });
-                }
-              }
-            } catch (err) {}
+        const popUrls = [];
+        $('ul.items li p.name a').each((_, el) => {
+          const href = $(el).attr('href') || '';
+          if (href) {
+            let catHref = href;
+            if (!catHref.includes('/category/')) {
+              catHref = '/category/' + catHref.replace(/^\//, '').replace(/-episode-\d+.*$/i, '');
+            }
+            const seriesUrl = catHref.startsWith('http') ? catHref : `${domain}${catHref.startsWith('/') ? '' : '/'}${catHref}`;
+            popUrls.push(seriesUrl);
           }
+        });
+
+        for (const seriesUrl of popUrls) {
+          if (processedSeries.has(seriesUrl)) continue;
+          processedSeries.add(seriesUrl);
+          try {
+            const detailsStr = await details({ url: seriesUrl });
+            const detailsObj = JSON.parse(detailsStr);
+            const episodes = detailsObj.episodes || [];
+            const title = detailsObj.anime?.title || '';
+            if (episodes.length > 0) {
+              console.log(`\n🔥 Deep Mining Popular Series [${processedSeries.size}]: "${title}" (${episodes.length} episodes)`);
+              for (const ep of episodes) {
+                try {
+                  await extractVideo({ url: ep.url, title: title, episode: ep.number });
+                } catch (err) {}
+              }
+            }
+          } catch (err) {}
         }
-      });
-    } catch (popErr) {
-      break;
+      } catch (popErr) {
+        // Next domain
+      }
     }
   }
 
