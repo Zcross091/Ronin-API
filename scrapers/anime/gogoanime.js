@@ -1,6 +1,5 @@
 // GogoAnime Scraper (Primary Priority Engine for Ronin API)
-// Supports search(), details(), extractVideo() for QuickJS engine
-// AND scrapeGogoanime() / scrapeGogoanimeLight() for Ronin API backend waterfall
+// Automatically caches all extracted stream links to Supabase DB
 
 const axios = require('axios');
 const cheerio = require('cheerio');
@@ -15,12 +14,18 @@ const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supaba
 
 async function saveToSupabase(title, episode, type, url) {
     if (!supabase) return;
-    const { error } = await supabase.from('anime_links').upsert(
-        { title: title.toLowerCase().trim(), episode, type, url },
-        { onConflict: 'title, episode, type' }
-    );
-    if (error) console.error("❌ Supabase Error:", error);
-    else console.log(`✅ Cached to Supabase: [${title}] Ep ${episode} -> ${url}`);
+    const cleanTitle = (title || '').toLowerCase().trim();
+    if (!cleanTitle || !url || !url.startsWith('http')) return;
+    try {
+        const { error } = await supabase.from('anime_links').upsert(
+            { title: cleanTitle, episode: episode || 1, type: type || 'embed', url },
+            { onConflict: 'title, episode, type' }
+        );
+        if (error) console.error("❌ Supabase Error:", error.message);
+        else console.log(`✅ Cached to Supabase: [${cleanTitle}] Ep ${episode || 1} (${type}) -> ${url}`);
+    } catch (e) {
+        console.error("❌ Supabase Save Exception:", e.message);
+    }
 }
 
 async function fetchHtml(url) {
@@ -50,7 +55,7 @@ const GOGO_DOMAINS = (typeof process !== 'undefined' && process.env && process.e
   : ["https://anitaku.pe", "https://gogoanime3.co", "https://gogoanime.or.at"];
 
 async function search(params) {
-  const query = params.query;
+  const query = typeof params === 'string' ? params : (params?.query || '');
   const results = [];
 
   for (const baseUrl of GOGO_DOMAINS) {
@@ -63,7 +68,7 @@ async function search(params) {
         const img = $(el).find('div.img a img').attr('src');
         const title = a.text();
         const href = a.attr('href') || '';
-        const link = baseUrl + href;
+        const link = href.startsWith('http') ? href : baseUrl + href;
         const id = href.split('/').pop();
         
         results.push({
@@ -85,13 +90,13 @@ async function search(params) {
 }
 
 async function details(params) {
-  const url = params.url;
+  const url = typeof params === 'string' ? params : (params?.url || '');
   const urlObj = new URL(url);
   const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
   const html = await fetchHtml(url);
   const $ = cheerio.load(html);
   
-  const title = $('div.anime_info_body_bg h1').text();
+  const title = $('div.anime_info_body_bg h1').text().trim();
   const id = url.split('/').pop();
 
   const movieId = $('#movie_id').attr('value') || $('input#movie_id').attr('value') || '';
@@ -156,7 +161,15 @@ async function details(params) {
 }
 
 async function extractVideo(params) {
-  const url = params.url;
+  const url = typeof params === 'string' ? params : (params?.url || params?.link || '');
+  const titleParam = params?.title || '';
+  const episodeParam = params?.episode || 0;
+
+  // Extract episode number and title slug directly from the episode URL if not passed explicitly
+  const epMatch = url.match(/(?:.*\/)?([^\/]+)-episode-(\d+)/i);
+  const title = titleParam || (epMatch ? epMatch[1].replace(/-/g, ' ').toLowerCase().trim() : '');
+  const epNum = episodeParam || (epMatch ? parseInt(epMatch[2]) : 1);
+
   const html = await fetchHtml(url);
   const $ = cheerio.load(html);
   
@@ -197,6 +210,16 @@ async function extractVideo(params) {
     });
   }
 
+  // ── AUTOMATIC SUPABASE CACHING ──
+  // Saves extracted stream URLs automatically whenever extractVideo is executed
+  if (sources.length > 0) {
+    for (const src of sources) {
+      if (src.url && src.url.startsWith('http')) {
+        await saveToSupabase(title || 'anime', epNum, "embed", src.url);
+      }
+    }
+  }
+
   return JSON.stringify({
     sources: sources.length > 0 ? sources : [{ url: "", quality: "none", isM3U8: false }],
     subtitles: []
@@ -210,17 +233,16 @@ async function scrapeGogoanime(query, epNum, domains) {
 
   for (const domain of activeDomains) {
     try {
-      // Stage 1: Try direct episode URL prediction first
+      // Stage 1: Direct episode URL prediction first
       const directEpUrl = `${domain}/${querySlug}-episode-${epNum}`;
       try {
-        const epHtml = await fetchHtml(directEpUrl);
-        const ep$ = cheerio.load(epHtml);
-        const iframe = ep$('.play-video iframe, iframe').attr('src');
-        if (iframe) {
-          const videoUrl = iframe.startsWith('http') ? iframe : `https:${iframe}`;
-          console.log(`⚡ Instant Direct Gogo Match: [${query}] Ep ${epNum} -> ${videoUrl}`);
-          await saveToSupabase(query, epNum, "embed", videoUrl);
-          return videoUrl;
+        const videoResStr = await extractVideo({ url: directEpUrl, title: cleanQuery, episode: epNum });
+        const videoObj = JSON.parse(videoResStr);
+        const videoSources = videoObj.sources || [];
+        const validSource = videoSources.find(s => s.url && s.url.startsWith('http'));
+        if (validSource) {
+          console.log(`⚡ Instant Direct Gogo Match: [${query}] Ep ${epNum} -> ${validSource.url}`);
+          return validSource.url;
         }
       } catch (err) {}
 
@@ -236,13 +258,12 @@ async function scrapeGogoanime(query, epNum, domains) {
 
       const targetEp = episodes.find(e => e.number === epNum);
       if (targetEp && targetEp.url) {
-        const videoResStr = await extractVideo({ url: targetEp.url });
+        const videoResStr = await extractVideo({ url: targetEp.url, title: cleanQuery, episode: epNum });
         const videoObj = JSON.parse(videoResStr);
         const videoSources = videoObj.sources || [];
         const validSource = videoSources.find(s => s.url && s.url.startsWith('http'));
         if (validSource) {
           console.log(`✅ Gogo Mined via gogoanime.js: [${query}] Ep ${epNum} -> ${validSource.url}`);
-          await saveToSupabase(query, epNum, "embed", validSource.url);
           return validSource.url;
         }
       }
