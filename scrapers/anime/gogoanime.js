@@ -281,3 +281,13 @@ module.exports = {
   scrapeGogoanime,
   scrapeGogoanimeLight: scrapeGogoanime
 };
+
+if (require.main === module) {
+  const query = process.argv[2] || "Solo Leveling";
+  const ep = parseInt(process.argv[3]) || 1;
+  console.log(`🚀 Independent CLI Miner: Searching for "${query}" Ep ${ep}...`);
+  scrapeGogoanime(query, ep).then(url => {
+    if (url) console.log(`🎉 SUCCESS Stream URL: ${url}`);
+    else console.log(`❌ No stream found for "${query}" Ep ${ep}`);
+  });
+}
