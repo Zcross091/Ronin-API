@@ -668,27 +668,20 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
                 }
             }
 
-            console.log(`\n⏳ Step 3: Mining Nyaa & Aniwave...`);
+            console.log(`\n⏳ Step 3: Mining Nyaa, Aniwave & Dub streams in parallel...`);
+            const targetEp = parseInt(episodeStr) || 1;
+            const isDubQuery = query.toLowerCase().endsWith(' dub');
             const [nyaaSuccess, aniwaveSuccess] = await Promise.all([
                 mineFromNyaa(titleVar),
-                mineFromAniwave(titleVar, episodeStr)
+                mineFromAniwave(titleVar, episodeStr),
+                (!isDubQuery)
+                    ? mineExtensionAllEpisodes('allanime', `${titleVar} dub`, targetEp, saveToSupabase).catch(() => ({}))
+                    : Promise.resolve({ minedCount: 0 })
             ]);
 
             if (hianimeDirectSuccess || gogoSuccess || extensionSuccess || nyaaSuccess || aniwaveSuccess) {
                 overallMined = true;
                 console.log(`🎉 Successfully mined streams using title variant: "${titleVar}"!`);
-                
-                // Mine Dub version for this successful title variant
-                if (!query.toLowerCase().endsWith(' dub')) {
-                    console.log(`\n🎙️ Step 4: Checking and mining Dub version for "${titleVar}"...`);
-                    try {
-                        const targetEp = parseInt(episodeStr) || 1;
-                        await mineFromGogo(`${titleVar} dub`);
-                        await mineExtensionAllEpisodes('allanime', `${titleVar} dub`, targetEp, saveToSupabase);
-                    } catch (dubErr: any) {
-                        console.log(`ℹ️ Dub mining notice: ${dubErr.message}`);
-                    }
-                }
                 break;
             }
         }
