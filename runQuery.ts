@@ -5,7 +5,7 @@ import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { waterfallMine, mineExtensionAllEpisodes, EXTENSION_WATERFALL } from './engine/waterfall';
-import { scrapeGogoanimeLight } from './scrapers/gogoanimeLight';
+import { scrapeGogoanimeLight } from './scrapers/anime/gogoanime';
 import { getSharedBrowser, closeSharedBrowser } from './scrapers/browserManager';
 
 dotenv.config();

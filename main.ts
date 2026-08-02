@@ -10,7 +10,7 @@ import gogoanime from './routes/gogoanime';
 import manga from './routes/manga';
 import miningRoutes from './routes/mining';
 import { GogoCDN } from './extractors';
-import { scrapeGogoanimeLight } from './scrapers/gogoanimeLight';
+import { scrapeGogoanimeLight } from './scrapers/anime/gogoanime';
 import { waterfallMine, EXTENSION_WATERFALL } from './engine/waterfall';
 
 dotenv.config();

@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs/promises';
 import { ExtensionRunner } from './sandbox';
-import { scrapeGogoanimeLight } from '../scrapers/gogoanimeLight';
+import { scrapeGogoanimeLight } from '../scrapers/anime/gogoanime';
 
 // Ordered list of extension script names to try (priority order)
 export const EXTENSION_WATERFALL: string[] = [
