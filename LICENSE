@@ -1,18 +1,42 @@
-PRIVATE & EDUCATIONAL RESEARCH LICENSE
+MIT LICENSE WITH ATTRIBUTION REQUIREMENT & COMMUNITY CONTRIBUTOR NOTICE
 
-1. PRIVATE CODE & COPYRIGHT
-This repository (Ronin API) is strictly for Ronin Interface giving life to the Website as well as the App, proprietary code. Absolutely no one is permitted to copy, distribute, modify, or use this code under any circumstances. You are explicitly banned from using this software.
+Copyright (c) 2026 Zcross091
 
-## IF YOU WANT IT, USE OPEN ANIME API(https://github.com/Zcross091/Open-Anime-API)
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-2. DMCA & COPYRIGHT INFRINGEMENT NOTICE
-This repository is strictly an EDUCATIONAL RESEARCH TOPIC exploring web automation and metadata aggregation. 
-- THIS CODE DOES NOT HOST, UPLOAD, OR SAVE ANY ANIME OR COPYRIGHTED MEDIA. 
-- This software solely consists of automated scripts that parse publicly available HTML metadata. 
-Because no copyrighted material is stored or distributed by this code, any and all DMCA claims directed at this repository are invalid and will be heavily contested as fraudulent.
+1. MANDATORY ATTRIBUTION & CREDIT
+   The above copyright notice, this permission notice, and explicit credit 
+   to the original author (Zcross091) must be included in all copies or 
+   substantial portions of the Software. You may NOT claim authorship, 
+   original creation, or exclusive rights over any part of this code or project 
+   that you did not write.
 
-3. ALTERNATIVE FOR PUBLIC USE
-As stated above, you are banned from using this specific repository. If you are a developer looking for an anime API framework to use or learn from, you MUST instead use the public open-source version:
+2. FORKING, CLONING & MODIFICATION
+   Developers and community members are explicitly encouraged to fork, clone, 
+   run, modify, and optimize this codebase to improve execution efficiency, 
+   scraper speed, and feature capability.
 
-Open Anime API
-https://github.com/Zcross091/Open-Anime-API
+3. OPEN COMMUNITY CONTRIBUTIONS
+   Contributions, optimizations, bug fixes, and feature enhancements via 
+   Pull Requests (PRs) are warmly welcomed! We are open to collaborating 
+   with developers worldwide to build a stronger, more efficient future for 
+   this repository.
+
+4. EDUCATIONAL RESEARCH & LEGAL DISCLAIMER
+   This software is created solely as an educational research tool exploring 
+   web automation, DOM parsing, and metadata indexing. 
+   - THIS SOFTWARE DOES NOT HOST, STORE, STREAM, OR DISTRIBUTE ANY COPYRIGHTED MEDIA.
+   - All operations interact strictly with publicly available web metadata.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
