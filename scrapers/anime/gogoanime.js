@@ -53,7 +53,7 @@ async function fetchHtml(url) {
 
 const GOGO_DOMAINS = (typeof process !== 'undefined' && process.env && process.env.GOGO_DOMAINS)
   ? process.env.GOGO_DOMAINS.split(',').map(d => d.trim().replace(/\/(popular|home)\/?$/i, '').replace(/\/$/, '')).filter(Boolean)
-  : ["https://anitaku.pe", "https://gogoanime3.co", "https://gogoanime.or.at"];
+  : ["https://gogoanime.or.at", "https://anitaku.pe", "https://gogoanime3.co", "https://gogoanime.cl"];
 
 async function search(params) {
   const query = typeof params === 'string' ? params : (params?.query || '');
