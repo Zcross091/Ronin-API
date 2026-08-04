@@ -5,6 +5,7 @@ import { scrapeGogoanimeLight } from '../scrapers/anime/gogoanime';
 
 // Ordered list of extension script names to try (priority order)
 export const EXTENSION_WATERFALL: string[] = [
+    'animepahe',
     'animeonsen',
     'sudatchi',
     'animegg',

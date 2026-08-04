@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { waterfallMine, mineExtensionAllEpisodes, EXTENSION_WATERFALL } from './engine/waterfall';
 import { scrapeGogoanimeLight } from './scrapers/anime/gogoanime';
+import { scrapeAnimepahe } from './scrapers/anime/animepahe';
 import { getSharedBrowser, closeSharedBrowser } from './scrapers/browserManager';
 
 dotenv.config();
@@ -630,8 +631,22 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
                 }
             }
 
+            let animepaheSuccess = false;
+            if (!gogoSuccess && !hianimeDirectSuccess) {
+                console.log(`\n⏳ GogoAnime & HiAnime failed. Trying Animepahe Direct Scraper for "${titleVar}"...`);
+                try {
+                    const paheStream = await scrapeAnimepahe(titleVar, targetEp);
+                    if (paheStream) {
+                        animepaheSuccess = true;
+                        console.log(`🎉 Animepahe successfully mined Ep ${targetEp} stream!`);
+                    }
+                } catch (e: any) {
+                    console.log(`❌ Animepahe direct failed for "${titleVar}": ${e.message}`);
+                }
+            }
+
             let extensionSuccess = false;
-            if (!hianimeDirectSuccess && !gogoSuccess) {
+            if (!hianimeDirectSuccess && !gogoSuccess && !animepaheSuccess) {
                 console.log(`\n⏳ Step 2: Running Extension Waterfall for "${titleVar}"...`);
                 const targetEp = parseInt(episodeStr) || 1;
                 for (const extName of EXTENSION_WATERFALL) {
