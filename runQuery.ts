@@ -48,35 +48,15 @@ if (!query) {
     process.exit(1);
 }
 
-// ── Automated Title Variant Resolver ──
+import { getSearchVariants as getMultiProviderSearchVariants } from './engine/animeMetadata';
+
+// ── Automated Title Variant Resolver (4-Tier Provider Fallback) ──
 async function getSearchVariants(searchQuery: string): Promise<string[]> {
-    const titles = new Set<string>();
-    titles.add(searchQuery);
     try {
-        const res = await axios.post('https://graphql.anilist.co', {
-            query: `query ($search: String) {
-                Media (search: $search, type: ANIME) {
-                    title { romaji english native }
-                    synonyms
-                }
-            }`,
-            variables: { search: searchQuery }
-        }, { timeout: 3500 });
-        
-        const media = res.data?.data?.Media;
-        if (media) {
-            if (media.title?.romaji) titles.add(media.title.romaji);
-            if (media.title?.english) titles.add(media.title.english);
-            if (Array.isArray(media.synonyms)) {
-                media.synonyms.forEach((s: string) => {
-                    if (s && s.length < 60 && !/[^\x00-\x7F]/.test(s)) titles.add(s);
-                });
-            }
-        }
+        return await getMultiProviderSearchVariants(searchQuery);
     } catch (e) {
-        // Fallback to initial query if AniList offline
+        return [searchQuery];
     }
-    return Array.from(titles);
 }
 
 async function saveToSupabase(title: string, episode: number, type: string, url: string) {
