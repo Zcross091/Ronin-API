@@ -648,7 +648,6 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
             let extensionSuccess = false;
             if (!hianimeDirectSuccess && !gogoSuccess && !animepaheSuccess) {
                 console.log(`\n⏳ Step 2: Running Extension Waterfall for "${titleVar}"...`);
-                const targetEp = parseInt(episodeStr) || 1;
                 for (const extName of EXTENSION_WATERFALL) {
                     try {
                         const { minedCount } = await mineExtensionAllEpisodes(extName, titleVar, targetEp, saveToSupabase);
@@ -664,7 +663,6 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
             }
 
             console.log(`\n⏳ Step 3: Mining Nyaa, Aniwave & Dub streams in parallel...`);
-            const targetEp = parseInt(episodeStr) || 1;
             const isDubQuery = query.toLowerCase().endsWith(' dub');
             const [nyaaSuccess, aniwaveSuccess] = await Promise.all([
                 mineFromNyaa(titleVar),
