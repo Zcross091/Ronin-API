@@ -29,6 +29,26 @@ export default async function miningRoutes(fastify: FastifyInstance, options: Fa
             }
         }
         return null;
+    function isSafeUrl(inputUrl: string): boolean {
+        try {
+            const parsed = new URL(inputUrl);
+            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+            const hostname = parsed.hostname.toLowerCase();
+            if (
+                hostname === 'localhost' ||
+                hostname === '127.0.0.1' ||
+                hostname === '::1' ||
+                hostname.startsWith('169.254.') ||
+                hostname.startsWith('10.') ||
+                hostname.startsWith('192.168.') ||
+                /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)
+            ) {
+                return false;
+            }
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     fastify.get('/api/mine/:extension/search', async (request, reply) => {
@@ -56,6 +76,7 @@ export default async function miningRoutes(fastify: FastifyInstance, options: Fa
         const { url } = request.query as { url: string };
 
         if (!url) return reply.status(400).send({ error: 'Missing url parameter' });
+        if (!isSafeUrl(url)) return reply.status(400).send({ error: 'Invalid or unsafe URL parameter' });
 
         const scriptPath = await findExtensionPath(extension);
         if (!scriptPath) return reply.status(404).send({ error: `Extension ${extension} not found` });
@@ -76,6 +97,7 @@ export default async function miningRoutes(fastify: FastifyInstance, options: Fa
         const { url } = request.query as { url: string };
 
         if (!url) return reply.status(400).send({ error: 'Missing url parameter' });
+        if (!isSafeUrl(url)) return reply.status(400).send({ error: 'Invalid or unsafe URL parameter' });
 
         const scriptPath = await findExtensionPath(extension);
         if (!scriptPath) return reply.status(404).send({ error: `Extension ${extension} not found` });

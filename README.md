@@ -162,4 +162,5 @@ Scrapes P2P torrent magnets from Nyaa.si.
 
 ## 📜 License & Credits
 
-Distributed under the **MIT License**. Created & Maintained by **[Zcross091](https://github.com/Zcross091)**.
+MIT LICENSE WITH ATTRIBUTION REQUIREMENT & COMMUNITY CONTRIBUTOR NOTICE
+Created & Maintained by **[Zcross091](https://github.com/Zcross091)**.
