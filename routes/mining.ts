@@ -29,6 +29,8 @@ export default async function miningRoutes(fastify: FastifyInstance, options: Fa
             }
         }
         return null;
+    }
+
     function isSafeUrl(inputUrl: string): boolean {
         try {
             const parsed = new URL(inputUrl);
