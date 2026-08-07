@@ -43,8 +43,7 @@ jobs:
           SOURCE="${{ github.event.client_payload.source || github.event.inputs.source }}"
           
           if [ -z "$QUERY" ]; then
-            echo "No query provided. Starting Scheduled Auto-Crawler Deep Miner via gogoanime.js..."
-            node scrapers/anime/gogoanime.js
+            echo "No query provided. Starting Scheduled Auto-Crawler Deep Miner (Top 50 AniList Pipeline)..."
             ts-node crawler.ts
           else
             echo "On-Demand User Mining for: $QUERY (Episode: $EPISODE, Source: $SOURCE)"
