@@ -58,27 +58,7 @@ class DOMParserPolyfill {
     }
 }
 
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-
-puppeteer.use(StealthPlugin());
-
-let sharedBrowser: any = null;
-
-async function getSharedBrowser() {
-    if (!sharedBrowser || !sharedBrowser.connected) {
-        sharedBrowser = await puppeteer.launch({
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-            ]
-        });
-    }
-    return sharedBrowser;
-}
+import { getSharedBrowser } from '../scrapers/browserManager';
 
 async function fetchWithPuppeteer(url: string, extraHeaders: any = {}): Promise<string> {
     try {

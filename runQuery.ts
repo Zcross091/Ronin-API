@@ -30,6 +30,13 @@ const HIANIME_CLUSTER = (process.env.HIANIME_CLUSTER || '')
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_KEY || '';
 
+async function exitProcess(code: number) {
+    try {
+        await closeSharedBrowser();
+    } catch {}
+    process.exit(code);
+}
+
 if (!supabaseUrl || !supabaseKey) {
     console.error('❌ Missing SUPABASE_URL or SUPABASE_KEY env variables.');
     process.exit(1);
@@ -577,20 +584,20 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
             if (forceSource.toLowerCase() === 'gogoanime' || forceSource.toLowerCase() === 'gogoanime direct') {
                 console.log(`\n⏳ Mining from GogoAnime Light...`);
                 await scrapeGogoanimeLight(query, targetEpNum, GOGO_DOMAINS);
-                process.exit(0);
+                await exitProcess(0);
             } else {
                 const { minedCount } = await mineExtensionAllEpisodes(forceSource, query, targetEpNum, saveToSupabase);
                 if (minedCount > 0) {
                     console.log(`\n✅ Deep-Dive extension mining completed successfully for: "${query}" (${minedCount} episodes saved via "${forceSource}")`);
-                    process.exit(0);
+                    await exitProcess(0);
                 } else {
                     console.error(`❌ Forced extension source "${forceSource}" failed to find streams for: "${query}"`);
-                    process.exit(1);
+                    await exitProcess(1);
                 }
             }
         } catch (err: any) {
             console.error(`❌ Forced source mining crashed:`, err.message);
-            process.exit(1);
+            await exitProcess(1);
         }
     }
 
@@ -598,13 +605,13 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
         const success = await mineFromAniwave(query, episodeStr);
         if (!success) {
             console.error(`❌ Aniwave failed for: "${query}"`);
-            process.exit(1);
+            await exitProcess(1);
         }
     } else if (serverStr === '3') {
         const success = await mineFromHianimeDirect(query, episodeStr);
         if (!success) {
             console.error(`❌ HiAnime failed for: "${query}"`);
-            process.exit(1);
+            await exitProcess(1);
         }
     } else {
         const titleVariants = await getSearchVariants(query);
@@ -681,10 +688,10 @@ async function mineFromHianimeDirect(query: string, episodeStr: string): Promise
 
         if (!overallMined) {
             console.error(`❌ All sources failed for: "${query}" across all title variants.`);
-            process.exit(1);
+            await exitProcess(1);
         }
     }
 
     console.log(`\n✅ Mining completed for: "${query}"`);
-    process.exit(0);
+    await exitProcess(0);
 })();

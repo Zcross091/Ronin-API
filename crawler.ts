@@ -115,7 +115,15 @@ async function runCrawler() {
         }
     }
     
-    console.log(`\n🎉 Ronin Fast Auto-Crawl finished successfully!`);
-}
+import { closeSharedBrowser } from './scrapers/browserManager';
 
-runCrawler().catch(console.error);
+runCrawler()
+    .then(async () => {
+        await closeSharedBrowser();
+        process.exit(0);
+    })
+    .catch(async (err) => {
+        console.error(err);
+        await closeSharedBrowser();
+        process.exit(1);
+    });

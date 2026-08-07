@@ -402,15 +402,29 @@ module.exports = {
 };
 
 if (require.main === module) {
+  const { closeSharedBrowser } = require('../browserManager');
   const query = process.argv[2];
   const ep = parseInt(process.argv[3]) || 1;
   if (query) {
     console.log(`🚀 Independent Deep Miner: Searching and Deep-Mining ALL episodes for "${query}"...`);
-    scrapeGogoanime(query, ep).then(url => {
+    scrapeGogoanime(query, ep).then(async (url) => {
       if (url) console.log(`\n🎉 SUCCESS Ep ${ep} Stream: ${url}`);
       else console.log(`\n⚠️ Mined series to Supabase (Requested Ep ${ep} url null)`);
+      await closeSharedBrowser();
+      process.exit(0);
+    }).catch(async (err) => {
+      console.error(err);
+      await closeSharedBrowser();
+      process.exit(1);
     });
   } else {
-    mineTrendingAndPopular(10);
+    mineTrendingAndPopular(10).then(async () => {
+      await closeSharedBrowser();
+      process.exit(0);
+    }).catch(async (err) => {
+      console.error(err);
+      await closeSharedBrowser();
+      process.exit(1);
+    });
   }
 }
