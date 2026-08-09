@@ -11,6 +11,13 @@ const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseKey = process.env.SUPABASE_KEY || "";
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 20000): Promise<T | null> {
+    return Promise.race([
+        promise,
+        new Promise<null>(resolve => setTimeout(() => resolve(null), timeoutMs))
+    ]);
+}
+
 async function fetchTop50TrendingFromAniList(): Promise<string[]> {
     try {
         console.log(`\n🌟 Fetching Top 50 Trending & Popular Airing Anime from AniList GraphQL...`);
@@ -44,7 +51,7 @@ async function fetchTop50TrendingFromAniList(): Promise<string[]> {
 }
 
 async function runCrawler() {
-    console.log(`\n🕸️ Starting Ronin Fast Auto-Crawler (Top 50 AniList Pipeline) 🕸️`);
+    console.log(`\n🕸️ Starting Ronin Fast Auto-Crawler (Top 50 AniList Pipeline with 20s Max-Per-Title Bounds) 🕸️`);
     
     const GOGO_DOMAINS = (process.env.GOGO_DOMAINS || '')
         .split(',')
@@ -62,28 +69,27 @@ async function runCrawler() {
             console.log(`=================================================`);
 
             try {
-                // Step 1: Deep mine via Gogoanime direct scraper (Sub & Dub)
-                const gogoStream = await scrapeGogoanime(title, 1, GOGO_DOMAINS);
-                let mined = !!gogoStream;
-
-                // Step 2: Fallback to Animepahe Direct scraper if Gogo stream was null
-                if (!mined) {
+                const minePromise = (async () => {
+                    const gogoStream = await scrapeGogoanime(title, 1, GOGO_DOMAINS);
+                    if (gogoStream) return true;
                     console.log(`⏳ Gogo stream unconfirmed for "${title}". Trying Animepahe Direct...`);
                     const paheStream = await scrapeAnimepahe(title, 1);
-                    mined = !!paheStream;
-                }
+                    return !!paheStream;
+                })();
+
+                const mined = await withTimeout(minePromise, 20000);
 
                 if (mined) {
                     totalMined++;
                     console.log(`🎉 Successfully mined streams for [${i + 1}/${top50Titles.length}] "${title}"`);
                 } else {
-                    console.log(`⚠️ Completed pass for "${title}".`);
+                    console.log(`⚠️ Completed pass or timed out (20s bound) for "${title}". Moving to next.`);
                 }
             } catch (err: any) {
                 console.error(`❌ Mining failed for "${title}":`, err.message);
             }
         }
-        console.log(`\n🎉 Top 50 AniList Auto-Crawl Finished! Mined stream links for ${totalMined}/${top50Titles.length} series.`);
+        console.log(`\n🎉 Top 50 AniList Auto-Crawl Finished! Processed ${top50Titles.length} series (${totalMined} confirmed direct streams).`);
     } else {
         console.log(`⚠️ Fallback: No titles fetched from AniList.`);
     }
