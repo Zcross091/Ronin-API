@@ -15,7 +15,7 @@ on:
 jobs:
   mine-manga:
     runs-on: ubuntu-latest
-    timeout-minutes: 25 # High timeout so it can background-cache the rest of the chapters
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -23,20 +23,27 @@ jobs:
         with:
           node-version: '22'
 
+      # ── 1. Cache node_modules for instant sub-3s bootstrap ──
+      - name: Cache Node Modules
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # ── 2. Install dependencies only on cache miss ──
       - name: Install dependencies
-        run: npm install
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci || npm install
 
-      - name: Install ts-node globally
-        run: npm install -g ts-node typescript
-
+      # ── 3. Run Priority Manga Miner ──
       - name: Run Priority Manga Miner
         run: |
           QUERY="${{ github.event.client_payload.query || github.event.inputs.query }}"
           CHAPTER="${{ github.event.client_payload.chapter || github.event.inputs.chapter }}"
           echo "Mining for Manga: $QUERY | Priority Chapter: $CHAPTER"
           
-          # Run the new prioritized on-demand script
-          ts-node on_demand_manga.ts "$QUERY" "$CHAPTER"
+          npx ts-node on_demand_manga.ts "$QUERY" "$CHAPTER"
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

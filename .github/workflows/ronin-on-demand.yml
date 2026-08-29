@@ -28,14 +28,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
 
-      - name: Install deps
+      # ── 1. Cache node_modules for instant sub-3s bootstrap ──
+      - name: Cache Node Modules
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # ── 2. Cache Puppeteer Chromium binary to avoid re-downloading ~200MB ──
+      - name: Cache Puppeteer Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: puppeteer-browsers-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # ── 3. Install dependencies only on cache miss ──
+      - name: Install dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci || npm install
 
-      - name: Install ts-node
-        run: npm install -g ts-node typescript
-
+      # ── 4. Run miner instantly using local ts-node ──
       - name: Run miner
         run: |
           QUERY="${{ github.event.client_payload.query || github.event.inputs.query }}"
@@ -44,10 +58,10 @@ jobs:
           
           if [ -z "$QUERY" ]; then
             echo "No query provided. Starting Scheduled Auto-Crawler Deep Miner (Top 50 AniList Pipeline)..."
-            ts-node crawler.ts
+            npx ts-node crawler.ts
           else
             echo "On-Demand User Mining for: $QUERY (Episode: $EPISODE, Source: $SOURCE)"
-            ts-node runQuery.ts "$QUERY" "1" "$EPISODE" "$SOURCE"
+            npx ts-node runQuery.ts "$QUERY" "1" "$EPISODE" "$SOURCE"
           fi
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

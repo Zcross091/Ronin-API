@@ -1,30 +1,36 @@
 name: Daily Manga Miner
 on:
   schedule:
-    # Runs at 17:10 UTC (10:40 PM IST) every day
     - cron: '10 17 * * *'
-  workflow_dispatch: # Allows manual trigger from the GitHub Actions tab
+  workflow_dispatch:
 
 jobs:
   mine-manga:
     runs-on: ubuntu-latest
-    timeout-minutes: 30 # You can safely drop the timeout now that we are only doing 100
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm' # This caches node_modules so boot-up is instant
 
+      # ── 1. Cache node_modules for instant sub-3s bootstrap ──
+      - name: Cache Node Modules
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # ── 2. Install dependencies only on cache miss ──
       - name: Install dependencies
-        run: npm ci # Uses clean install from package-lock for faster execution
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm ci || npm install
 
-      - name: Install ts-node globally
-        run: npm install -g ts-node typescript
-
+      # ── 3. Run Smart Top 100 Manga Miner ──
       - name: Run Smart Top 100 Manga Miner
-        run: ts-node manga_miner.ts
+        run: npx ts-node manga_miner.ts
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
