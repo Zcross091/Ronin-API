@@ -57,8 +57,8 @@ jobs:
           SOURCE="${{ github.event.client_payload.source || github.event.inputs.source }}"
           
           if [ -z "$QUERY" ]; then
-            echo "No query provided. Starting Scheduled Auto-Crawler Deep Miner (Top 50 AniList Pipeline)..."
-            npx ts-node crawler.ts
+            echo "No query provided. Starting Scheduled Auto-Crawler Deep Miner (miner_http.js)..."
+            node miner_http.js
           else
             echo "On-Demand User Mining for: $QUERY (Episode: $EPISODE, Source: $SOURCE)"
             npx ts-node runQuery.ts "$QUERY" "1" "$EPISODE" "$SOURCE"
