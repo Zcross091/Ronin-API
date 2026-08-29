@@ -39,6 +39,7 @@ jobs:
 
       # ── 2. Cache Puppeteer Chromium binary to avoid re-downloading ~200MB ──
       - name: Cache Puppeteer Chromium
+        id: puppeteer-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/puppeteer
@@ -48,6 +49,11 @@ jobs:
       - name: Install dependencies
         if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: npm ci || npm install
+
+      # ── 3.1 Ensure Puppeteer Chrome is installed if cache missed ──
+      - name: Ensure Puppeteer Chrome
+        if: steps.puppeteer-cache.outputs.cache-hit != 'true'
+        run: npx puppeteer browsers install chrome
 
       # ── 4. Run miner instantly using local ts-node ──
       - name: Run miner

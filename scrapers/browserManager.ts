@@ -7,16 +7,49 @@ let sharedBrowser: any = null;
 
 export async function getSharedBrowser() {
     if (!sharedBrowser || !sharedBrowser.connected) {
-        sharedBrowser = await puppeteer.launch({
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--window-size=1920,1080',
-            ]
-        });
+        const launchArgs = [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--window-size=1920,1080',
+        ];
+
+        try {
+            sharedBrowser = await puppeteer.launch({
+                headless: true,
+                args: launchArgs
+            });
+        } catch (launchErr: any) {
+            console.warn(`⚠️ Standard Puppeteer launch failed (${launchErr.message}), trying fallback executable...`);
+            const fallbackPaths = [
+                process.env.PUPPETEER_EXECUTABLE_PATH,
+                '/usr/bin/google-chrome',
+                '/usr/bin/google-chrome-stable',
+                '/usr/bin/chromium-browser',
+                '/usr/bin/chromium'
+            ].filter(Boolean) as string[];
+
+            let launched = false;
+            for (const execPath of fallbackPaths) {
+                try {
+                    sharedBrowser = await puppeteer.launch({
+                        executablePath: execPath,
+                        headless: true,
+                        args: launchArgs
+                    });
+                    launched = true;
+                    console.log(`✅ Successfully launched fallback Chrome at: ${execPath}`);
+                    break;
+                } catch (e) {
+                    // Try next path
+                }
+            }
+
+            if (!launched) {
+                throw launchErr;
+            }
+        }
     }
     return sharedBrowser;
 }
