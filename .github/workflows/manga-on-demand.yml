@@ -26,7 +26,7 @@ jobs:
       # ── 1. Cache node_modules for instant sub-3s bootstrap ──
       - name: Cache Node Modules
         id: node-modules-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
